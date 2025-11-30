@@ -1089,7 +1089,8 @@ class KnabenAPI {
             body.order_direction = orderDirection;
         }
 
-        const url = `${KNABEN_API_URL}/v${KNABEN_API_VERSION}/`;
+        // ✅ FIX: Endpoint senza slash finale (altrimenti 404)
+        const url = `${KNABEN_API_URL}/v${KNABEN_API_VERSION}`;
         
         console.log(`🦉 [Knaben API] POST ${url}`);
         console.log(`🦉 [Knaben API] Body: ${JSON.stringify(body)}`);
