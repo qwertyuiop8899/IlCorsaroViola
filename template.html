@@ -1,22 +1,15 @@
 <!DOCTYPE html>
 <html lang="it">
-
-<head>
+<head> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="https://github.com/qwertyuiop8899/logo/blob/main/logo.png?raw=true">
-    <link rel="shortcut icon" type="image/png"
-        href="https://github.com/qwertyuiop8899/logo/blob/main/logo.png?raw=true">
+    <link rel="shortcut icon" type="image/png" href="https://github.com/qwertyuiop8899/logo/blob/main/logo.png?raw=true">
     <title>IlCorsaroViola | Configurazione</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        html,
-        body {
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        html, body {
             width: 100%;
             height: 100%;
             overflow-x: hidden;
@@ -25,7 +18,7 @@
             margin: 0;
             padding: 0;
         }
-
+        
         /* Three.js container */
         #container {
             position: fixed;
@@ -40,17 +33,16 @@
             pointer-events: none;
             overflow: hidden;
         }
-
+        
         #container canvas {
             pointer-events: none;
         }
-
+        
         /* Remove old elements */
-        #canvas-bg,
-        #stars-container {
+        #canvas-bg, #stars-container {
             display: none;
         }
-
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: #ffffff;
@@ -60,13 +52,13 @@
             position: relative;
             background: #0a0515;
         }
-
+        
         @media (max-width: 640px) {
             body {
                 padding: 10px;
             }
         }
-
+        
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -74,15 +66,12 @@
             z-index: 10;
             pointer-events: auto;
         }
-
+        
         /* Make all interactive elements clickable */
-        input,
-        button,
-        a,
-        label {
+        input, button, a, label {
             pointer-events: auto;
         }
-
+        
         /* Header Section */
         .header {
             display: flex;
@@ -91,24 +80,24 @@
             margin-bottom: 40px;
             gap: 30px;
         }
-
+        
         .logo {
             width: clamp(60px, 15vw, 100px);
             height: clamp(60px, 15vw, 100px);
             border-radius: 50%;
             box-shadow: 0 8px 32px rgba(138, 43, 226, 0.4);
         }
-
+        
         .brand h1 {
             font-size: clamp(1.8rem, 8vw, 4.5em);
             font-weight: 700;
-            background: linear-gradient(90deg,
-                    #ffffff 0%,
-                    #e0b3ff 20%,
-                    #9333ea 40%,
-                    #9333ea 60%,
-                    #e0b3ff 80%,
-                    #ffffff 100%);
+            background: linear-gradient(90deg, 
+                #ffffff 0%, 
+                #e0b3ff 20%, 
+                #9333ea 40%, 
+                #9333ea 60%, 
+                #e0b3ff 80%, 
+                #ffffff 100%);
             background-size: 200% 100%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -119,21 +108,19 @@
             word-break: break-word;
             hyphens: auto;
         }
-
+        
         @keyframes waveColor {
             0% {
                 background-position: 0% 0%;
             }
-
             50% {
                 background-position: 100% 0%;
             }
-
             100% {
                 background-position: 0% 0%;
             }
         }
-
+        
         .header-left {
             display: flex;
             flex-direction: row;
@@ -143,21 +130,21 @@
             width: 100%;
             padding: 0 10px;
         }
-
+        
         @media (max-width: 640px) {
             .header-left {
                 gap: 8px;
                 flex-wrap: wrap;
             }
         }
-
+        
         .header-left .logo-container {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 15px;
         }
-
+        
         .prisonmike-img {
             width: clamp(40px, 8vw, 60px);
             height: auto;
@@ -165,22 +152,22 @@
             transition: transform 0.3s ease;
             align-self: center;
         }
-
+        
         .prisonmike-img:hover {
             transform: scale(1.1);
         }
-
+        
         @media (max-width: 640px) {
             .prisonmike-img {
                 width: clamp(30px, 10vw, 50px);
             }
         }
-
+        
         .header-right {
             width: 100%;
             max-width: 1200px;
         }
-
+        
         .features-box {
             background: rgba(20, 20, 40, 0.25);
             backdrop-filter: blur(10px);
@@ -191,33 +178,33 @@
             grid-template-columns: repeat(2, 1fr);
             gap: clamp(10px, 2vw, 20px);
         }
-
+        
         @media (max-width: 640px) {
             .features-box {
                 grid-template-columns: 1fr;
                 padding: 15px;
             }
         }
-
+        
         .features-box h4 {
             color: #c084fc;
             margin-bottom: 8px;
             font-size: clamp(0.9em, 2vw, 1em);
             grid-column: span 1;
         }
-
+        
         @media (max-width: 640px) {
             .features-box h4 {
                 grid-column: span 1;
             }
         }
-
+        
         .features-box ul {
             list-style: none;
             padding: 0;
             grid-column: span 1;
         }
-
+        
         .features-box li {
             color: #d1d5db;
             margin-bottom: 6px;
@@ -225,14 +212,14 @@
             padding-left: 18px;
             position: relative;
         }
-
+        
         .features-box li::before {
             content: '✦';
             position: absolute;
             left: 0;
             color: #9333ea;
         }
-
+        
         .config-info {
             background: rgba(147, 51, 234, 0.2);
             border: 1px solid rgba(147, 51, 234, 0.4);
@@ -240,19 +227,19 @@
             padding: 15px;
             grid-column: span 1;
         }
-
+        
         .config-info p {
             margin: 0;
             font-size: 0.9em;
             color: #e5e7eb;
         }
-
+        
         #status {
             font-weight: 600;
             margin-top: 8px;
             font-size: 1em;
         }
-
+        
         /* Main Grid Layout */
         .config-grid {
             display: grid;
@@ -260,35 +247,35 @@
             gap: 20px;
             margin-bottom: 30px;
         }
-
+        
         @media (min-width: 1024px) {
             .config-grid {
                 grid-template-columns: repeat(3, 1fr);
             }
-
+            
             .config-grid .full-width {
                 grid-column: span 3;
             }
-
+            
             .config-grid .half-width {
                 grid-column: span 2;
             }
-
+            
             .config-grid .two-rows {
                 grid-row: span 2;
             }
         }
-
+        
         @media (min-width: 768px) and (max-width: 1023px) {
             .config-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
-
+            
             .config-grid .full-width {
                 grid-column: span 2;
             }
         }
-
+        
         /* Service Cards */
         .service-card {
             background: rgba(20, 20, 40, 0.25);
@@ -299,19 +286,19 @@
             transition: all 0.3s ease;
             pointer-events: auto;
         }
-
+        
         .service-card:hover {
             border-color: rgba(147, 51, 234, 0.6);
             box-shadow: 0 8px 32px rgba(147, 51, 234, 0.2);
         }
-
+        
         .service-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 15px;
         }
-
+        
         .service-title {
             display: flex;
             align-items: center;
@@ -320,30 +307,30 @@
             font-weight: 600;
             color: #c084fc;
         }
-
+        
         .service-title a {
             color: #9333ea;
             text-decoration: none;
             opacity: 0.7;
             transition: opacity 0.3s;
         }
-
+        
         .service-title a:hover {
             opacity: 1;
         }
-
+        
         .key-icon {
             font-size: 1em;
         }
-
+        
         input[type="checkbox"] {
             width: 20px;
             height: 20px;
             cursor: pointer;
             accent-color: #9333ea;
         }
-
-        input[type="text"],
+        
+        input[type="text"], 
         input[type="password"],
         textarea {
             width: 100%;
@@ -356,19 +343,18 @@
             transition: all 0.3s ease;
             margin-top: 8px;
         }
-
-        input:focus,
-        textarea:focus {
+        
+        input:focus, textarea:focus {
             outline: none;
             border-color: #9333ea;
             box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.2);
         }
-
+        
         input:disabled {
             opacity: 0.4;
             cursor: not-allowed;
         }
-
+        
         label {
             display: flex;
             align-items: center;
@@ -376,14 +362,14 @@
             cursor: pointer;
             user-select: none;
         }
-
+        
         .search-sites {
             display: flex;
             flex-direction: column;
             gap: 12px;
             margin-top: 10px;
         }
-
+        
         .search-sites label {
             background: rgba(10, 10, 26, 0.4);
             padding: 12px 15px;
@@ -391,12 +377,12 @@
             border: 1px solid rgba(147, 51, 234, 0.2);
             transition: all 0.3s;
         }
-
+        
         .search-sites label:hover {
             border-color: rgba(147, 51, 234, 0.5);
             background: rgba(10, 10, 26, 0.6);
         }
-
+        
         /* Action Section */
         .action-section {
             background: rgba(20, 20, 40, 0.25);
@@ -406,7 +392,7 @@
             padding: 35px;
             pointer-events: auto;
         }
-
+        
         .button-group {
             display: flex;
             gap: 20px;
@@ -414,7 +400,7 @@
             flex-wrap: wrap;
             justify-content: center;
         }
-
+        
         button {
             flex: 1;
             min-width: 200px;
@@ -429,31 +415,31 @@
             transition: all 0.3s ease;
             box-shadow: 0 4px 16px rgba(147, 51, 234, 0.3);
         }
-
+        
         button:hover:not(:disabled) {
             background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
             transform: translateY(-2px);
             box-shadow: 0 6px 24px rgba(147, 51, 234, 0.4);
         }
-
+        
         button:active:not(:disabled) {
             transform: translateY(0);
         }
-
+        
         button:disabled {
             background: rgba(100, 100, 120, 0.3);
             cursor: not-allowed;
             box-shadow: none;
         }
-
+        
         #link-container {
             display: none;
         }
-
+        
         #link-container.show {
             display: block;
         }
-
+        
         textarea {
             width: 100%;
             min-height: 80px;
@@ -466,7 +452,7 @@
             border-radius: 8px;
             color: #ffffff;
         }
-
+        
         .section-title {
             color: #c084fc;
             font-size: 1.2em;
@@ -474,64 +460,10 @@
             font-weight: 600;
             text-align: center;
         }
-
+        
         small {
             color: #9ca3af;
             font-size: clamp(0.7rem, 1.5vw, 0.875rem);
-        }
-
-        /* Utility Classes */
-        .hidden {
-            display: none !important;
-        }
-
-        .text-center {
-            text-align: center;
-        }
-
-        .w-full {
-            width: 100%;
-        }
-
-        .mb-2 {
-            margin-bottom: 0.5rem;
-        }
-
-        .mt-2 {
-            margin-top: 0.5rem;
-        }
-
-        .text-xs {
-            font-size: 0.75rem;
-        }
-
-        .text-sm {
-            font-size: 0.875rem;
-        }
-
-        .font-bold {
-            font-weight: bold;
-        }
-
-        .text-red {
-            color: #ff6b6b;
-        }
-
-        .text-green {
-            color: #4ec9b0;
-        }
-
-        .text-purple {
-            color: #c084fc;
-        }
-
-        .flex {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .flex-1 {
-            flex: 1;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/88/three.min.js"></script>
@@ -611,40 +543,35 @@
         }
     </script>
 </head>
-
 <body>
     <div id="container"></div>
-
+    
     <div class="container">
         <!-- Header -->
         <div class="header">
             <div class="header-left">
                 <img src="/prisonmike.png" alt="Prison Mike" class="prisonmike-img">
-
+                
                 <div class="logo-container">
-                    <img src="https://github.com/qwertyuiop8899/logo/blob/main/logo.png?raw=true" alt="Logo"
-                        class="logo">
+                    <img src="https://github.com/qwertyuiop8899/logo/blob/main/logo.png?raw=true" alt="Logo" class="logo">
                     <div class="brand" style="text-align: center;">
                         <h1 style="margin-bottom: 5px;">IlCorsaroViola</h1>
-                        <small style="font-size: 12px; color: #9ca3af; display: block; line-height: 1.5;">
-                            Addon creato partendo da <a href="https://stremizio.vercel.app/" target="_blank"
-                                style="color: #9333ea; text-decoration: none;">Stremizio 2.0</a>, grazie a
-                            <a href="https://github.com/StremioItalia/stremizio" target="_blank"
-                                style="color: #9333ea; text-decoration: none;">Steve Celticus</a>
+                        <small style="font-size: 14px; color: #9ca3af; display: block; line-height: 1.5;">
+                            Addon creato partendo da <a href="https://stremizio.vercel.app/" target="_blank" style="color: #9333ea; text-decoration: none;">Stremizio 2.0</a>, grazie a 
+                            <a href="https://github.com/StremioItalia/stremizio" target="_blank" style="color: #9333ea; text-decoration: none;">Steve Celticus</a>
                         </small>
                     </div>
                 </div>
-
+                
                 <img src="/prisonmike.png" alt="Prison Mike" class="prisonmike-img">
             </div>
-
+            
             <div class="header-right">
                 <div class="features-box">
                     <div style="grid-column: span 1;">
                         <h4>Caratteristiche principali:</h4>
                         <ul>
-                            <li><strong>Multi-sorgente:</strong> Il Corsaro Nero (DB locale incrementale con Cache RD
-                                reale), UIndex, Knaben e Jackett (opzionale)</li>
+                            <li><strong>Multi-sorgente:</strong> Il Corsaro Nero (DB locale incrementale con Cache RD reale), UIndex, Knaben e Jackett (opzionale)</li>
                             <li><strong>Ottimizzato per l'Italia:</strong> Priorità ai contenuti in italiano 🇮🇹</li>
                         </ul>
                     </div>
@@ -657,15 +584,14 @@
                         </ul>
                     </div>
                 </div>
-
+                
                 <div class="config-info">
                     <p style="text-align: center;">Configura i servizi che vuoi utilizzare:</p>
-                    <div id="status" style="text-align: center;">✓ Configurazione pronta (Solo P2P) | Siti: CorsaroNero,
-                        UIndex, Knaben</div>
+                    <div id="status" style="text-align: center;">✓ Configurazione pronta (Solo P2P) | Siti: CorsaroNero, UIndex, Knaben</div>
                 </div>
             </div>
         </div>
-
+        
         <!-- Configuration Grid -->
         <div class="config-grid">
             <!-- Debrid Services Row -->
@@ -681,7 +607,7 @@
                 </div>
                 <input id="rd_key" placeholder="Real-Debrid API Key" type="password" disabled>
             </div>
-
+            
             <div class="service-card">
                 <div class="service-header">
                     <div class="service-title">
@@ -694,68 +620,7 @@
                 </div>
                 <input id="torbox_key" placeholder="Torbox API Key" type="password" disabled>
             </div>
-
-            <!-- AllDebrid Config -->
-            <div class="service-card">
-                <div class="service-header">
-                    <div class="service-title">
-                        🅰️ AllDebrid (Opzionale)
-                        <a href="https://alldebrid.com/apikeys" target="_blank" title="Ottieni API Key">
-                            <span class="key-icon">🔑</span>
-                        </a>
-                    </div>
-                    <input type="checkbox" id="use_alldebrid">
-                </div>
-
-                <div id="alldebrid_auth_section" class="hidden">
-                    <!-- Connect Button (OAuth) -->
-                    <div id="ad_oauth_section">
-                        <button id="ad_connect_btn" style="margin-bottom: 10px;">
-                            🔗 Connetti AllDebrid
-                        </button>
-                        <div class="text-center">
-                            <a href="#" id="ad_manual_entry_btn"
-                                style="color: #9ca3af; font-size: 0.8em; text-decoration: underline;">...oppure
-                                inserisci API Key manualmente</a>
-                        </div>
-                    </div>
-
-                    <!-- Manual Input Area -->
-                    <div id="ad_manual_section" class="hidden">
-                        <small style="display: block; margin-bottom: 5px;">API Key Manuale:</small>
-                        <div style="display: flex; gap: 10px;">
-                            <input id="alldebrid_key" placeholder="AllDebrid API Key" type="password" style="flex: 1;"
-                                disabled>
-                            <button id="ad_switch_oauth_btn" style="width: auto; min-width: 50px; padding: 10px;"
-                                title="Torna a Connessione Automatica">↩️</button>
-                        </div>
-                    </div>
-
-                    <!-- PIN Display Area -->
-                    <div id="ad_pin_area" class="hidden"
-                        style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; text-align: center; margin-top: 10px;">
-                        <p style="color: #ddd; margin-bottom: 5px;">Inserisci questo codice su AllDebrid:</p>
-                        <p id="ad_pin_code"
-                            style="font-size: 1.5em; font-family: monospace; color: #c084fc; font-weight: bold; margin: 10px 0;">
-                            ----</p>
-                        <a id="ad_pin_link" href="#" target="_blank"
-                            style="color: #c084fc; text-decoration: underline; display: block; margin-bottom: 10px;">Clicca
-                            qui per inserire il codice</a>
-                        <div style="font-size: 0.8em; color: #aaa;">
-                            <span class="animate-spin">⏳</span> In attesa di autorizzazione...
-                        </div>
-                    </div>
-
-                    <!-- Connected State -->
-                    <div id="ad_connected_area" class="hidden"
-                        style="background: rgba(46, 204, 113, 0.2); border: 1px solid rgba(46, 204, 113, 0.5); padding: 15px; border-radius: 8px; text-align: center; margin-top: 10px;">
-                        <p style="color: #2ecc71; font-weight: bold; margin: 0;">✅ Account Collegato</p>
-                        <button id="ad_disconnect_btn"
-                            style="background: none; border: none; color: #e74c3c; text-decoration: underline; font-size: 0.8em; min-width: auto; padding: 5px; box-shadow: none; margin-top: 5px;">Disconnetti</button>
-                    </div>
-                </div>
-            </div>
-
+            
             <!-- Siti di Ricerca Torrent (occupa 2 righe) -->
             <div class="service-card two-rows">
                 <div class="section-title">🔎 Siti di Ricerca Torrent</div>
@@ -776,9 +641,7 @@
                     <label>
                         <input type="checkbox" id="use_max_res_limit">
                         <span>✂️ Limita Risultati per Risoluzione</span>
-                        <select id="max_res_limit"
-                            style="margin-left: auto; width: 50px; background: rgba(10, 10, 26, 0.6); color: white; border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 4px; padding: 4px; cursor: pointer;"
-                            disabled>
+                        <select id="max_res_limit" style="margin-left: auto; width: 50px; background: rgba(10, 10, 26, 0.6); color: white; border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 4px; padding: 4px; cursor: pointer;" disabled>
                             <option value="1">1</option>
                             <option value="2">2</option>
                             <option value="3" selected>3</option>
@@ -791,7 +654,7 @@
                     </label>
                 </div>
             </div>
-
+            
             <!-- MediaFlow and Jackett Row -->
             <div class="service-card">
                 <div class="service-header">
@@ -800,12 +663,11 @@
                 <small>Per condividere Real-Debrid tra più utenti</small>
                 <input id="mediaflow_url" placeholder="Proxy URL (es: https://your-proxy.com)" type="text">
                 <input id="mediaflow_password" placeholder="Password (opzionale)" type="password">
-                <div id="proxy_no_password_warning"
-                    style="display: none; background: rgba(255, 100, 100, 0.15); border: 1px solid #FF6B6B; border-radius: 4px; padding: 8px; margin-top: 8px; font-size: 0.85em; color: #FF6B6B;">
+                <div id="proxy_no_password_warning" style="display: none; background: rgba(255, 100, 100, 0.15); border: 1px solid #FF6B6B; border-radius: 4px; padding: 8px; margin-top: 8px; font-size: 0.85em; color: #FF6B6B;">
                     ⚠️ Proxy senza Password - Connessione non protetta!
                 </div>
             </div>
-
+            
             <div class="service-card">
                 <div class="service-header">
                     <div class="service-title">🔍 Jackett Configuration (Opzionale - Solo Italiani)</div>
@@ -815,13 +677,13 @@
                 <input id="jackett_api_key" placeholder="Jackett API Key" type="password">
                 <input id="jackett_password" placeholder="Jackett Password (opzionale)" type="password">
             </div>
-
+            
             <div class="action-section full-width">
                 <div class="button-group">
                     <button id="install_button" disabled>Installa Addon</button>
                     <button id="copy_button" disabled>Copia Link</button>
                 </div>
-
+                
                 <div id="link-container">
                     <p class="section-title"><small>Link di installazione generato:</small></p>
                     <textarea id="install_link_display" rows="3" readonly></textarea>
@@ -835,22 +697,20 @@
         const rdKeyInput = document.getElementById("rd_key");
         const useTorboxCheckbox = document.getElementById("use_torbox");
         const torboxKeyInput = document.getElementById("torbox_key");
-        const useAllDebridCheckbox = document.getElementById("use_alldebrid");
-        const allDebridKeyInput = document.getElementById("alldebrid_key");
 
         const mediaflowUrlInput = document.getElementById("mediaflow_url");
         const mediaflowPasswordInput = document.getElementById("mediaflow_password");
         const jackettUrlInput = document.getElementById("jackett_url");
         const jackettApiKeyInput = document.getElementById("jackett_api_key");
         const jackettPasswordInput = document.getElementById("jackett_password");
-
+        
         // Checkboxes for search sites
         const useCorsaroNeroCheckbox = document.getElementById("use_corsaronero");
         const useUIndexCheckbox = document.getElementById("use_uindex");
         const useKnabenCheckbox = document.getElementById("use_knaben");
         const useMaxResLimitCheckbox = document.getElementById("use_max_res_limit");
         const maxResLimitSelect = document.getElementById("max_res_limit");
-
+        
         // Buttons
         const installButton = document.getElementById("install_button");
         const copyButton = document.getElementById("copy_button");
@@ -872,167 +732,6 @@
             updateInstallLink();
         });
 
-        // AllDebrid OAuth Elements
-        const adAuthSection = document.getElementById("alldebrid_auth_section");
-        const adConnectBtn = document.getElementById("ad_connect_btn");
-        const adOAuthSection = document.getElementById("ad_oauth_section");
-        const adManualEntryBtn = document.getElementById("ad_manual_entry_btn");
-        const adManualSection = document.getElementById("ad_manual_section");
-        const adSwitchOAuthBtn = document.getElementById("ad_switch_oauth_btn");
-
-        const adPinArea = document.getElementById("ad_pin_area");
-        const adPinCode = document.getElementById("ad_pin_code");
-        const adPinLink = document.getElementById("ad_pin_link");
-        const adConnectedArea = document.getElementById("ad_connected_area");
-        const adDisconnectBtn = document.getElementById("ad_disconnect_btn");
-
-        // Toggle Manual/OAuth
-        adManualEntryBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            adOAuthSection.classList.add('hidden');
-            adManualSection.classList.remove('hidden');
-        });
-
-        adSwitchOAuthBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            adManualSection.classList.add('hidden');
-            adOAuthSection.classList.remove('hidden');
-        });
-
-        // State tracking
-        let isOAuthConnected = false;
-
-        // Enable/disable AllDebrid section (Updated Logic)
-        useAllDebridCheckbox.addEventListener('change', () => {
-            const isChecked = useAllDebridCheckbox.checked;
-            if (isChecked) {
-                adAuthSection.classList.remove('hidden');
-            } else {
-                adAuthSection.classList.add('hidden');
-            }
-
-            // UI State Management
-            if (isChecked) {
-                if (isOAuthConnected) {
-                    // 1. Authenticated via OAuth -> Show Green Box
-                    adConnectBtn.classList.add('hidden');
-                    adOAuthSection.classList.add('hidden'); // Hide the whole oauth wrapper
-                    adConnectedArea.classList.remove('hidden');
-                    adPinArea.classList.add('hidden');
-                    adManualSection.classList.add('hidden');
-                } else if (allDebridKeyInput.value) {
-                    // 2. Has value but NOT OAuth (Manual entry or loaded config) -> Show Manual Input
-                    adOAuthSection.classList.add('hidden'); // Hide Connect button
-                    adManualSection.classList.remove('hidden'); // Show Manual Input
-                    adConnectedArea.classList.add('hidden');
-                    adPinArea.classList.add('hidden');
-                } else {
-                    // 3. No value -> Default state (Show Connect Button)
-                    adOAuthSection.classList.remove('hidden');
-                    adManualSection.classList.add('hidden');
-                    adConnectedArea.classList.add('hidden');
-                    adPinArea.classList.add('hidden');
-                }
-            }
-
-            allDebridKeyInput.disabled = !isChecked;
-            updateInstallLink();
-        });
-
-        // OAuth Flow: Connect Button
-        adConnectBtn.addEventListener('click', async () => {
-            adConnectBtn.disabled = true;
-            adConnectBtn.textContent = "⏳ Richiesta codice...";
-
-            try {
-                const response = await fetch('/alldebrid/code');
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    const pin = data.data.pin;
-                    const check = data.data.check;
-                    const userUrl = data.data.user_url;
-
-                    // Update UI
-                    adConnectBtn.classList.add('hidden');
-                    adPinArea.classList.remove('hidden');
-                    adPinCode.textContent = pin;
-                    adPinLink.href = userUrl;
-
-                    // Start polling
-                    pollForToken(check, pin);
-                } else {
-                    alert("Errore richiesta codice: " + (data.error?.message || 'Unknown'));
-                    resetAdUi();
-                }
-            } catch (e) {
-                console.error(e);
-                alert("Errore di connessione al backend");
-                resetAdUi();
-            }
-        });
-
-        // OAuth Flow: Disconnect
-        adDisconnectBtn.addEventListener('click', () => {
-            allDebridKeyInput.value = '';
-            resetAdUi();
-            updateInstallLink();
-        });
-
-        // Polling Function
-        async function pollForToken(check, pin) {
-            let attempts = 0;
-            const maxAttempts = 60; // 1 minute timeout approx (poll every 1.5s?)
-
-            const interval = setInterval(async () => {
-                attempts++;
-                if (attempts > maxAttempts) {
-                    clearInterval(interval);
-                    alert("Tempo scaduto. Riprova.");
-                    resetAdUi();
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`/alldebrid/token?check=${check}&pin=${pin}`);
-                    const data = await response.json();
-
-                    if (data.status === 'success') {
-                        clearInterval(interval);
-                        const token = data.data.apikey;
-
-                        // Success!
-                        isOAuthConnected = true; // Mark as OAuth flow
-                        adPinArea.classList.add('hidden');
-                        adConnectedArea.classList.remove('hidden');
-                        adOAuthSection.classList.add('hidden'); // Hide connect wrapper
-                        allDebridKeyInput.value = token;
-                        updateInstallLink();
-
-                        // Save to existing config just in case
-                        if (!window.EXISTING_CONFIG) window.EXISTING_CONFIG = {};
-                        window.EXISTING_CONFIG.alldebrid_key = token;
-
-                    } else if (data.data && data.data.activated === false) {
-                        // Waiting... do nothing
-                    } else {
-                        // Error or other state
-                        // Typically "authorization_pending" logic is internal to the API response structure check
-                    }
-                } catch (e) {
-                    console.error("Polling error", e);
-                }
-            }, 2000);
-        }
-
-        function resetAdUi() {
-            adConnectBtn.disabled = false;
-            adConnectBtn.textContent = "🔗 Connetti AllDebrid";
-            adConnectBtn.classList.remove('hidden');
-            adPinArea.classList.add('hidden');
-            adConnectedArea.classList.add('hidden');
-        }
-
         // Enable/disable Max Resolution Limit select based on checkbox
         useMaxResLimitCheckbox.addEventListener('change', () => {
             maxResLimitSelect.disabled = !useMaxResLimitCheckbox.checked;
@@ -1047,7 +746,7 @@
 
             // Build config object (TMDB always included)
             const config = { tmdb_key: tmdbKey };
-
+            
             // Real-Debrid
             if (useRdCheckbox.checked) {
                 const rdKey = rdKeyInput.value.trim();
@@ -1056,7 +755,8 @@
                     config.rd_key = rdKey;
                 }
             }
-
+            
+            // Torbox
             if (useTorboxCheckbox.checked) {
                 const torboxKey = torboxKeyInput.value.trim();
                 if (torboxKey) {
@@ -1064,16 +764,7 @@
                     config.torbox_key = torboxKey;
                 }
             }
-
-            // AllDebrid
-            if (useAllDebridCheckbox.checked) {
-                const adKey = allDebridKeyInput.value.trim();
-                if (adKey) {
-                    config.use_alldebrid = true;
-                    config.alldebrid_key = adKey;
-                }
-            }
-
+            
             // MediaFlow Proxy / EasyProxy
             const mediaflowUrl = mediaflowUrlInput.value.trim();
             const mediaflowPassword = mediaflowPasswordInput.value.trim();
@@ -1091,25 +782,25 @@
             } else {
                 proxyWarning.style.display = 'none';
             }
-
+            
             // Jackettio
             const jackettUrl = jackettUrlInput.value.trim();
             const jackettApiKey = jackettApiKeyInput.value.trim();
             if (jackettUrl && jackettApiKey) {
                 config.jackett_url = jackettUrl;
                 config.jackett_api_key = jackettApiKey;
-
+                
                 const jackettPassword = jackettPasswordInput.value.trim();
                 if (jackettPassword) {
                     config.jackett_password = jackettPassword;
                 }
             }
-
+            
             // Search sites selection
             config.use_corsaronero = useCorsaroNeroCheckbox.checked;
             config.use_uindex = useUIndexCheckbox.checked;
             config.use_knaben = useKnabenCheckbox.checked;
-
+            
             // Max Resolution Limit (only if checkbox is checked)
             if (useMaxResLimitCheckbox.checked) {
                 const maxResLimit = maxResLimitSelect.value;
@@ -1117,13 +808,13 @@
                     config.max_res_limit = parseInt(maxResLimit);
                 }
             }
-
+            
             // Check if at least one search site is selected
             let searchSites = [];
             if (config.use_corsaronero) searchSites.push("CorsaroNero");
             if (config.use_uindex) searchSites.push("UIndex");
             if (config.use_knaben) searchSites.push("Knaben");
-
+            
             if (searchSites.length === 0) {
                 // No search sites selected - show error
                 statusEl.textContent = "❌ Seleziona almeno un sito per la ricerca";
@@ -1133,25 +824,24 @@
                 copyButton.disabled = true;
                 return;
             }
-
+            
             // Generate install URL
             const encodedConfig = btoa(JSON.stringify(config));
             const installUrl = `stremio://${window.location.host}/${encodedConfig}/manifest.json`;
-
+            
             installLinkDisplay.value = installUrl;
             linkContainer.classList.add('show');
             installButton.disabled = false;
             copyButton.disabled = false;
-
+            
             // Status message
             let services = [];
             if (config.use_rd) services.push("Real-Debrid");
             if (config.use_torbox) services.push("Torbox");
-            if (config.use_alldebrid) services.push("AllDebrid");
 
             if (config.mediaflow_url) services.push("MediaFlow");
             if (config.jackett_url) services.push("Jackettio");
-
+            
             const serviceText = services.length > 0 ? ` (${services.join(', ')})` : ' (Solo P2P)';
             const searchText = ` | Siti: ${searchSites.join(', ')}`;
             statusEl.textContent = `✓ Configurazione pronta${serviceText}${searchText}`;
@@ -1164,9 +854,9 @@
             if (window.EXISTING_CONFIG) {
                 console.log('📝 Preloading existing configuration...', window.EXISTING_CONFIG);
                 const cfg = window.EXISTING_CONFIG;
-
+                
                 // TMDb API Key (required) - Not visible in UI, hardcoded
-
+                
                 // Debrid services - Real-Debrid
                 if (cfg.use_rd) {
                     const useRdCheckbox = document.getElementById('use_rd');
@@ -1180,7 +870,7 @@
                         }
                     }
                 }
-
+                
                 // Torbox
                 if (cfg.use_torbox) {
                     const useTorboxCheckbox = document.getElementById('use_torbox');
@@ -1194,21 +884,7 @@
                         }
                     }
                 }
-
-                // AllDebrid
-                if (cfg.use_alldebrid) {
-                    const useAllDebridCheckbox = document.getElementById('use_alldebrid');
-                    const allDebridKeyInput = document.getElementById('alldebrid_key');
-                    if (useAllDebridCheckbox && allDebridKeyInput) {
-                        useAllDebridCheckbox.checked = true;
-                        allDebridKeyInput.disabled = false;
-                        if (cfg.alldebrid_key) {
-                            allDebridKeyInput.value = cfg.alldebrid_key;
-                            console.log('✅ Loaded alldebrid_key');
-                        }
-                    }
-                }
-
+                
                 // MediaFlow Proxy
                 if (cfg.mediaflow_url) {
                     const mediaflowUrlInput = document.getElementById('mediaflow_url');
@@ -1224,7 +900,7 @@
                         console.log('✅ Loaded mediaflow_password');
                     }
                 }
-
+                
                 // Jackettio
                 if (cfg.jackett_url) {
                     const jackettUrlInput = document.getElementById('jackett_url');
@@ -1247,7 +923,7 @@
                         console.log('✅ Loaded jackett_password');
                     }
                 }
-
+                
                 // Search sites checkboxes
                 if (cfg.use_corsaronero !== undefined) {
                     const useCorsaroNeroCheckbox = document.getElementById('use_corsaronero');
@@ -1270,7 +946,7 @@
                         console.log('✅ Loaded use_knaben:', cfg.use_knaben);
                     }
                 }
-
+                
                 // Max Resolution Limit
                 if (cfg.max_res_limit) {
                     const useMaxResLimitCheckbox = document.getElementById('use_max_res_limit');
@@ -1282,9 +958,9 @@
                         console.log('✅ Loaded max_res_limit:', cfg.max_res_limit);
                     }
                 }
-
+                
                 console.log('✅ Configuration preloaded successfully');
-
+                
                 // Trigger updateInstallLink to refresh the UI
                 updateInstallLink();
             } else {
@@ -1295,21 +971,20 @@
         // Event listeners for all inputs
         rdKeyInput.addEventListener('input', updateInstallLink);
         torboxKeyInput.addEventListener('input', updateInstallLink);
-        allDebridKeyInput.addEventListener('input', updateInstallLink);
 
         mediaflowUrlInput.addEventListener('input', updateInstallLink);
         mediaflowPasswordInput.addEventListener('input', updateInstallLink);
         jackettUrlInput.addEventListener('input', updateInstallLink);
         jackettApiKeyInput.addEventListener('input', updateInstallLink);
         jackettPasswordInput.addEventListener('input', updateInstallLink);
-
+        
         // Event listeners for search site checkboxes
         useCorsaroNeroCheckbox.addEventListener('change', updateInstallLink);
         useUIndexCheckbox.addEventListener('change', updateInstallLink);
         useKnabenCheckbox.addEventListener('change', updateInstallLink);
         useMaxResLimitCheckbox.addEventListener('change', updateInstallLink);
         maxResLimitSelect.addEventListener('change', updateInstallLink);
-
+        
         // Initial call to enable buttons
         updateInstallLink();
 
@@ -1324,6 +999,7 @@
                     statusEl.textContent = "✓ Link copiato negli appunti!";
                     statusEl.style.color = '#4EC9B0';
                     const btnText = copyButton.textContent;
+                    copyButton.textContent = "Copiato!";
                     setTimeout(() => {
                         copyButton.textContent = btnText;
                         statusEl.textContent = originalText;
@@ -1339,11 +1015,11 @@
         let uniforms;
         let loader = new THREE.TextureLoader();
         let texture;
-
+        
         loader.setCrossOrigin("anonymous");
         loader.load(
             'https://s3-us-west-2.amazonaws.com/s.cdpn.io/982762/noise.png',
-            function (tex) {
+            function(tex) {
                 texture = tex;
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
@@ -1387,7 +1063,7 @@
             onWindowResize();
             window.addEventListener('resize', onWindowResize, false);
 
-            document.addEventListener('mousemove', function (e) {
+            document.addEventListener('mousemove', function(e) {
                 uniforms.u_mouse.value.x = e.clientX / window.innerWidth;
                 uniforms.u_mouse.value.y = 1.0 - (e.clientY / window.innerHeight);
             });
@@ -1406,5 +1082,4 @@
         }
     </script>
 </body>
-
 </html>
