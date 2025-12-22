@@ -5537,9 +5537,6 @@ async function handleStream(type, id, config, workerOrigin) {
 
                 if (externalResults.length > 0) {
                     console.log(`✅ [External Addons] Received ${externalResults.length} total results`);
-                    // DEBUG: Check if externalAddon is present at source
-                    const sampleResult = externalResults[0];
-                    console.log(`🔍 [EXT DEBUG] Sample result: externalAddon="${sampleResult.externalAddon}", externalProvider="${sampleResult.externalProvider}", source="${sampleResult.source}"`);
                     rawResultsByProvider.ExternalAddons.push(...externalResults);
                 } else {
                     console.log(`⚠️ [External Addons] No results received`);
@@ -6423,11 +6420,6 @@ async function handleStream(type, id, config, workerOrigin) {
                         cacheType = 'none';
                     }
 
-                    // DEBUG: Log result properties to debug display names
-                    if (result.source === 'RARBG' || result.externalAddon) {
-                        console.log(`🔍 [DEBUG DISPLAY] source="${result.source}", externalAddon="${result.externalAddon}", externalProvider="${result.externalProvider}"`);
-                    }
-
                     const isCached = cacheType === 'global' || cacheType === 'personal';
                     const cacheStatusIcon = isCached ? '⚡' : '⏬';
                     const errorIcon = streamError ? '⚠️ ' : '';
@@ -6435,8 +6427,6 @@ async function handleStream(type, id, config, workerOrigin) {
                     // New Name Format: IL 🏴‍☠️ 🔮 [👑] [⚡] \n [Quality]
                     let badgePrefix = 'IL 🏴‍☠️ 🔮';
 
-                    // DEBUG: Unconditional log for ALL results
-                    console.log(`🔍 [BADGE DEBUG] source="${result.source}", externalAddon="${result.externalAddon}", externalProvider="${result.externalProvider}"`);
                     if (result.externalAddon) {
                         const addonName = EXTERNAL_ADDONS[result.externalAddon] ? EXTERNAL_ADDONS[result.externalAddon].name : result.externalAddon;
                         badgePrefix = `${result.sourceEmoji || '🔗'} ${addonName}`;
