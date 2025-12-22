@@ -663,6 +663,22 @@
                         <span>🌌 TorrentGalaxy (Internazionale)</span>
                     </label>
                     <label>
+                        <input type="checkbox" id="use_torrentio" checked>
+                        <span>🅣 Torrentio (Esterno)</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="use_mediafusion" checked>
+                        <span>🅜 MediaFusion (Esterno)</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="use_comet" checked>
+                        <span>🅒 Comet (Esterno)</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="use_rarbg" checked>
+                        <span>🏴 RARBG (Proxy)</span>
+                    </label>
+                    <label>
                         <input type="checkbox" id="use_max_res_limit">
                         <span>✂️ Limita Risultati per Risoluzione</span>
                         <select id="max_res_limit"
@@ -736,6 +752,10 @@
         const useUIndexCheckbox = document.getElementById("use_uindex");
         const useKnabenCheckbox = document.getElementById("use_knaben");
         const useTorrentGalaxyCheckbox = document.getElementById("use_torrentgalaxy");
+        const useTorrentioCheckbox = document.getElementById("use_torrentio");
+        const useMediaFusionCheckbox = document.getElementById("use_mediafusion");
+        const useCometCheckbox = document.getElementById("use_comet");
+        const useRarbgCheckbox = document.getElementById("use_rarbg");
         const useMaxResLimitCheckbox = document.getElementById("use_max_res_limit");
         const maxResLimitSelect = document.getElementById("max_res_limit");
 
@@ -829,6 +849,10 @@
             config.use_uindex = useUIndexCheckbox.checked;
             config.use_knaben = useKnabenCheckbox.checked;
             config.use_torrentgalaxy = useTorrentGalaxyCheckbox.checked;
+            config.use_torrentio = useTorrentioCheckbox.checked;
+            config.use_mediafusion = useMediaFusionCheckbox.checked;
+            config.use_comet = useCometCheckbox.checked;
+            config.use_rarbg = useRarbgCheckbox.checked;
 
             // Max Resolution Limit (only if checkbox is checked)
             if (useMaxResLimitCheckbox.checked) {
@@ -844,6 +868,10 @@
             if (config.use_uindex) searchSites.push("UIndex");
             if (config.use_knaben) searchSites.push("Knaben");
             if (config.use_torrentgalaxy) searchSites.push("TorrentGalaxy");
+            if (config.use_torrentio) searchSites.push("Torrentio");
+            if (config.use_mediafusion) searchSites.push("MediaFusion");
+            if (config.use_comet) searchSites.push("Comet");
+            if (config.use_rarbg) searchSites.push("RARBG");
 
             if (searchSites.length === 0) {
                 // No search sites selected - show error
@@ -983,6 +1011,22 @@
                         console.log('✅ Loaded use_torrentgalaxy:', cfg.use_torrentgalaxy);
                     }
                 }
+                if (cfg.use_torrentio !== undefined) {
+                    const el = document.getElementById('use_torrentio');
+                    if (el) el.checked = cfg.use_torrentio;
+                }
+                if (cfg.use_mediafusion !== undefined) {
+                    const el = document.getElementById('use_mediafusion');
+                    if (el) el.checked = cfg.use_mediafusion;
+                }
+                if (cfg.use_comet !== undefined) {
+                    const el = document.getElementById('use_comet');
+                    if (el) el.checked = cfg.use_comet;
+                }
+                if (cfg.use_rarbg !== undefined) {
+                    const el = document.getElementById('use_rarbg');
+                    if (el) el.checked = cfg.use_rarbg;
+                }
 
                 // Max Resolution Limit
                 if (cfg.max_res_limit) {
@@ -1020,6 +1064,10 @@
         useUIndexCheckbox.addEventListener('change', updateInstallLink);
         useKnabenCheckbox.addEventListener('change', updateInstallLink);
         useTorrentGalaxyCheckbox.addEventListener('change', updateInstallLink);
+        useTorrentioCheckbox.addEventListener('change', updateInstallLink);
+        useMediaFusionCheckbox.addEventListener('change', updateInstallLink);
+        useCometCheckbox.addEventListener('change', updateInstallLink);
+        useRarbgCheckbox.addEventListener('change', updateInstallLink);
         useMaxResLimitCheckbox.addEventListener('change', updateInstallLink);
         maxResLimitSelect.addEventListener('change', updateInstallLink);
 
