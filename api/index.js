@@ -1671,6 +1671,13 @@ async function fetchTorrentGalaxyData(searchQuery, type = 'movie', metadata = nu
                     if (type === 'series' && category !== TorrentGalaxyCategory.TV) continue;
                     if (type === 'anime' && category !== TorrentGalaxyCategory.Anime && category !== TorrentGalaxyCategory.TV) continue;
 
+                    // ✅ ITALIAN FILTER: Same as Knaben - only accept Italian/Multi content
+                    const torrentTitle = item.n || '';
+                    if (!isItalian(torrentTitle)) {
+                        // Skip non-Italian content
+                        continue;
+                    }
+
                     // Convert bytes to human-readable size
                     const sizeBytes = parseInt(item.s) || 0;
                     let sizeStr = '0 B';
