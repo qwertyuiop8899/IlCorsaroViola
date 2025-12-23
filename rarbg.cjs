@@ -139,6 +139,42 @@ function cleanTitle(title) {
 }
 
 /**
+ * Estrae la qualità dal titolo
+ */
+function extractQuality(title) {
+    if (!title) return '';
+    const qualityPatterns = [
+        /(2160p?|4k|uhd)/i,
+        /(1080p?)/i,
+        /(720p?)/i,
+        /(480p?)/i,
+        /\b(sd)\b/i,
+        /\b(webrip|web-rip)\b/i,
+        /\b(bluray|blu-ray|bdremux)\b/i,
+        /\b(remux)\b/i,
+        /\b(hdrip)\b/i,
+        /\b(cam|ts|tc)\b/i
+    ];
+    for (const pattern of qualityPatterns) {
+        const match = title.match(pattern);
+        if (match) {
+            let quality = match[1].toLowerCase();
+
+            // Normalize resolutions: always add 'p' suffix (except 4k/uhd)
+            if (quality === '2160' || quality === '2160p' || quality === 'uhd' || quality === '4k') {
+                return '4K';  // Normalize to 4K
+            }
+            if (quality === '1080') return '1080p';
+            if (quality === '720') return '720p';
+            if (quality === '480') return '480p';
+
+            return quality;
+        }
+    }
+    return '';
+}
+
+/**
  * Converte bytes in stringa leggibile
  */
 function bytesToSize(bytes) {
@@ -566,6 +602,7 @@ async function searchRARBG(title, year, type, imdbId = null, options = {}) {
                 size: candidate.size,
                 sizeBytes: candidate.sizeBytes,
                 seeders: candidate.seeders,
+                quality: extractQuality(candidate.name),  // ✅ Add quality extraction
                 source: "RARBG"
             };
         }))
