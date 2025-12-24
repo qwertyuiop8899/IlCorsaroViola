@@ -7509,7 +7509,7 @@ export default async function handler(req, res) {
                 version: '2.0.0',
                 name: addonName,
                 description: 'Streaming da UIndex, CorsaroNero DB local, Knaben e Jackettio con o senza Real-Debrid, Torbox e Alldebrid.',
-                logo: 'https://github.com/qwertyuiop8899/logo/blob/main/logo.png?raw=true',
+                logo: 'https://i.imgur.com/kZK4KKS.png',
                 resources: ['stream'],
                 types: ['movie', 'series', 'anime'],
                 idPrefixes: ['tt', 'kitsu'],
