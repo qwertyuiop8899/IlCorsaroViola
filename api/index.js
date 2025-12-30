@@ -16,6 +16,7 @@ const rdCacheChecker = require('../rd-cache-checker.cjs');
 const { searchRARBG } = require('../rarbg.cjs');
 const aioFormatter = require('../aiostreams-formatter.cjs');
 const packFilesHandler = require('../pack-files-handler.cjs');
+const introSkip = require('../introskip.cjs');
 
 // ✅ External Addon Integration (Torrentio, MediaFusion, Comet)
 import { fetchExternalAddonsFlat, EXTERNAL_ADDONS } from './external-addons.js';
@@ -3940,18 +3941,13 @@ async function fetchUIndexData(searchQuery, type = 'movie', italianTitle = null,
 }
 
 // ✅ IMPROVED Matching functions - Supporta SEASON PACKS come Torrentio
-// ✅ MODIFICATA: Aggiunto parametro skipTitleCheck
 function isExactEpisodeMatch(torrentTitle, showTitleOrTitles, seasonNum, episodeNum, isAnime = false, absoluteEpisodeNum = null, skipTitleCheck = false) {
     if (!torrentTitle || !showTitleOrTitles) return false;
 
-    // FIX: Definisci isDebugTarget PRIMA di usarlo
-    const isDebugTarget = torrentTitle.toLowerCase().includes('scissione') &&
-        torrentTitle.toLowerCase().includes('s01e01') &&
-        torrentTitle.toLowerCase().includes('2160p');
-
     // DEBUG: Log rejected single episodes
-    if (isDebugTarget) {
-        console.log(`🔍 [Match Debug] Checking: "${torrentTitle.substring(0, 80)}" for S${seasonNum}E${episodeNum} (Anime: ${isAnime}, SkipTitle: ${skipTitleCheck})`);
+    if (torrentTitle.includes('155da22a') || torrentTitle.includes('3d700a66') ||
+        (torrentTitle.toLowerCase().includes('scissione') && torrentTitle.toLowerCase().includes('s01e01') && torrentTitle.toLowerCase().includes('2160p'))) {
+        console.log(`🔍 [Match Debug] Checking: "${torrentTitle.substring(0, 80)}" for S${seasonNum}E${episodeNum}`);
     }
 
     // ✅ STEP 1: Light cleaning (keep dots and dashes for episode ranges!)
@@ -3967,11 +3963,16 @@ function isExactEpisodeMatch(torrentTitle, showTitleOrTitles, seasonNum, episode
         .replace(/\s+/g, ' ')
         .trim();
 
-    const titlesToCheck = Array.isArray(showTitleOrTitles) ? showTitleOrTitles : [showTitleOrTitles];
-
     const isDebugTarget = torrentTitle.toLowerCase().includes('scissione') &&
         torrentTitle.toLowerCase().includes('s01e01') &&
         torrentTitle.toLowerCase().includes('2160p');
+
+    // If skipTitleCheck is true (e.g. trusted DB result), bypass strict title matching
+    if (skipTitleCheck) {
+        if (isDebugTarget) console.log(`    ⏩ Skipping title check (trusted source)`);
+    }
+
+    const titlesToCheck = Array.isArray(showTitleOrTitles) ? showTitleOrTitles : [showTitleOrTitles];
 
     // ✅ STEP 3: Check if title matches (PHASE 1 - Normal match)
     const checkTitleMatch = (titlesList) => {
@@ -4001,7 +4002,7 @@ function isExactEpisodeMatch(torrentTitle, showTitleOrTitles, seasonNum, episode
         });
     };
 
-    let titleIsAMatch = checkTitleMatch(titlesToCheck);
+    let titleIsAMatch = skipTitleCheck ? true : checkTitleMatch(titlesToCheck);
 
     // ✅ STEP 3.5: If no match, try PHASE 2 - Split on "-" as last resort
     if (!titleIsAMatch) {
@@ -4295,8 +4296,8 @@ function isExactEpisodeMatch(torrentTitle, showTitleOrTitles, seasonNum, episode
 
     // ✅ COMPLETE SERIES PACK: Check for [COMPLETA] / [COMPLETE] / [FULL SERIES] without specific season number
     // This handles anime and series that are packaged as complete series (e.g., "Death Note (2006) [COMPLETA]")
-    // FIX: Aggiunta regex per intervalli di anni (es. "Game of Thrones (2011-2019)")
-    const completeSeriesPattern = /(?:complete|completa|full|tutte|all)\s*(?:series|serie|seasons|stagioni|collection|collezione|pack)|(?:\d+\s*(?:season|stagion)[ei]?)|(?:\bS\d+\s*-\s*S?\d+\b)|(?:\(20\d{2}-20\d{2}\))/i;
+    // Also supports year ranges like (2011-2019) which indicate full series run
+    const completeSeriesPattern = /(?:completa?|complete|full.*series|serie.*completa?|integrale|\(\d{4}-\d{4}\))/i;
     if (completeSeriesPattern.test(normalizedTorrentTitle)) {
         // Only match if there's NO explicit season number (avoids false positives like "S02 COMPLETA")
         const hasExplicitSeason = /(?:stagione|season|s)\s*\d{1,2}/i.test(normalizedTorrentTitle);
@@ -5646,7 +5647,6 @@ async function handleStream(type, id, config, workerOrigin) {
                 filteredDbResults = dbResults.filter(dbResult => {
                     // Handle different result formats: searchEpisodeFiles uses torrent_title, others use title
                     const torrentTitle = dbResult.torrent_title || dbResult.title;
-
                     // TRUST ID MATCH: If torrent has correct IMDB ID, skip title check
                     // This fixes issues where torrent title is in different language (e.g. "Il Trono di Spade" vs "Game of Thrones")
                     const trustTitle = dbResult.imdb_id && dbResult.imdb_id === mediaDetails.imdbId;
@@ -6599,6 +6599,22 @@ async function handleStream(type, id, config, workerOrigin) {
         // ✅ Build streams with enhanced error handling - supports multiple debrid services
         let streams = [];
 
+        // ⏩ INTROSKIP: Lookup intro data for series episodes (only for debrid)
+        let introData = null;
+        const useAnyDebrid = useRealDebrid || useTorbox;
+        if (config.introskip_enabled && type === 'series' && season && episode && useAnyDebrid) {
+            const seriesImdbId = mediaDetails?.imdbId || imdbId;
+            if (seriesImdbId && seriesImdbId.startsWith('tt')) {
+                console.log(`⏩ [IntroSkip] Looking up intro for ${seriesImdbId} S${season}E${episode}...`);
+                introData = await introSkip.lookupIntro(seriesImdbId, parseInt(season), parseInt(episode));
+                if (introData) {
+                    console.log(`⏩ [IntroSkip] Found intro: ${introData.start_sec}s - ${introData.end_sec}s (confidence: ${introData.confidence})`);
+                } else {
+                    console.log(`⏩ [IntroSkip] No intro data found`);
+                }
+            }
+        }
+
         for (const result of filteredResults) {
             try {
                 const qualityDisplay = result.quality ? result.quality.toUpperCase() : 'Unknown';
@@ -6657,6 +6673,7 @@ async function handleStream(type, id, config, workerOrigin) {
 
                     // AIOStreams-compatible format or standard format
                     let streamName;
+                    const introIcon = introData ? '⏩ ' : '';
                     if (config.aiostreams_mode) {
                         streamName = aioFormatter.formatStreamName({
                             addonName: 'IlCorsaroViola',
@@ -6665,8 +6682,9 @@ async function handleStream(type, id, config, workerOrigin) {
                             quality: result.quality || 'Unknown',
                             hasError: !!streamError
                         });
+                        if (introData) streamName = `${introIcon}${streamName}`;
                     } else {
-                        streamName = `${badgePrefix} [👑] [${cacheStatusIcon}]${errorIcon}\n${result.quality || 'Unknown'}`;
+                        streamName = `${introIcon}${badgePrefix} [👑] [${cacheStatusIcon}]${errorIcon}\n${result.quality || 'Unknown'}`;
                     }
 
                     const debugInfo = streamError ? `\n⚠️ Stream error: ${streamError}` : '';
@@ -6826,6 +6844,7 @@ async function handleStream(type, id, config, workerOrigin) {
 
                     // AIOStreams-compatible format or standard format
                     let streamName;
+                    const introIconTB = introData ? '⏩ ' : '';
                     if (config.aiostreams_mode) {
                         streamName = aioFormatter.formatStreamName({
                             addonName: 'IlCorsaroViola',
@@ -6834,8 +6853,9 @@ async function handleStream(type, id, config, workerOrigin) {
                             quality: result.quality || 'Unknown',
                             hasError: !!streamError
                         });
+                        if (introData) streamName = `${introIconTB}${streamName}`;
                     } else {
-                        streamName = `${badgePrefix} [📦] [${cacheStatusIcon}]${errorIcon}\n${result.quality || 'Unknown'}`;
+                        streamName = `${introIconTB}${badgePrefix} [📦] [${cacheStatusIcon}]${errorIcon}\n${result.quality || 'Unknown'}`;
                     }
 
                     // New Title Format
@@ -7988,6 +8008,8 @@ export default async function handler(req, res) {
                             const patterns = [
                                 // Standard: S08E02 (with word boundary after episode number)
                                 new RegExp(`s${seasonStr}e${episodeStr}(?![0-9])`, 'i'),
+                                // New: S08EP02 (Common in Italian releases)
+                                new RegExp(`s${seasonStr}ep${episodeStr}(?![0-9])`, 'i'),
                                 // Compact: 8x02 (with leading zero, word boundary)
                                 new RegExp(`${season}x${episodeStr}(?![0-9])`, 'i'),
                                 // Compact: 8x2 (without leading zero, word boundary)
@@ -8127,6 +8149,8 @@ export default async function handler(req, res) {
                             const patterns = [
                                 // Standard: S08E02 (with word boundary after episode number)
                                 new RegExp(`s${seasonStr}e${episodeStr}(?![0-9])`, 'i'),
+                                // New: S08EP02 (Common in Italian releases)
+                                new RegExp(`s${seasonStr}ep${episodeStr}(?![0-9])`, 'i'),
                                 // Compact: 8x02 (with leading zero, word boundary)
                                 new RegExp(`${season}x${episodeStr}(?![0-9])`, 'i'),
                                 // Compact: 8x2 (without leading zero, word boundary)
@@ -8464,6 +8488,25 @@ export default async function handler(req, res) {
                             console.error(`❌ [RealDebrid] MediaFlow proxy failed: ${mfError.message}`);
                             // 🛑 STOP! Do not fallback to direct link to avoid bans.
                             return res.redirect(302, `${TORRENTIO_VIDEO_BASE}/videos/download_failed_v2.mp4`);
+                        }
+                    }
+
+                    // ⏩ INTROSKIP: Wrap in HLS proxy if enabled for series
+                    if (userConfig.introskip_enabled && type === 'series' && season && episode) {
+                        try {
+                            // Get imdbId for this torrent to lookup intro
+                            const episodeImdbId = dbEnabled ? await dbHelper.getImdbIdByHash(infoHash) : null;
+                            if (episodeImdbId && episodeImdbId.startsWith('tt')) {
+                                const introDataRD = await introSkip.lookupIntro(episodeImdbId, parseInt(season), parseInt(episode));
+                                if (introDataRD && introDataRD.end_sec > 0) {
+                                    // Wrap in HLS proxy for real intro skipping
+                                    const encodedStream = encodeURIComponent(finalUrl);
+                                    finalUrl = `${workerOrigin}/introskip/hls.m3u8?stream=${encodedStream}&start=${introDataRD.start_sec}&end=${introDataRD.end_sec}`;
+                                    console.log(`⏩ [IntroSkip] Wrapped in HLS proxy: ${introDataRD.start_sec}s - ${introDataRD.end_sec}s`);
+                                }
+                            }
+                        } catch (introErr) {
+                            console.warn(`⏩ [IntroSkip] Error applying HLS proxy: ${introErr.message}`);
                         }
                     }
 
@@ -9193,6 +9236,7 @@ export default async function handler(req, res) {
                         // Use regex with word boundaries to avoid partial matches (e1 matching e11)
                         const patterns = [
                             new RegExp(`s${seasonStr}e${episodeStr}(?![0-9])`, 'i'),
+                            new RegExp(`s${seasonStr}ep${episodeStr}(?![0-9])`, 'i'),
                             new RegExp(`${season}x${episodeStr}(?![0-9])`, 'i'),
                             new RegExp(`${season}x${episode}(?![0-9])`, 'i'),
                             new RegExp(`s${seasonStr}\\.e${episodeStr}(?![0-9])`, 'i'),
@@ -9250,11 +9294,31 @@ export default async function handler(req, res) {
                 console.log(`[Torbox] Torrent state: download_present=${torrent?.download_present}, active=${torrent?.active}, download_finished=${torrent?.download_finished}, download_state=${torrent?.download_state}`);
 
                 if (torrent && statusReady(torrent)) {
-                    const result = await _unrestrictLink(torrent);
+                    let result = await _unrestrictLink(torrent);
                     if (result === 'FAILED_RAR') {
                         console.log(`[Torbox] Failed: RAR archive`);
                         return res.redirect(302, `${TORRENTIO_VIDEO_BASE}/videos/failed_rar_v2.mp4`);
                     }
+
+                    // ⏩ INTROSKIP: Wrap in HLS proxy if enabled for series
+                    if (userConfig.introskip_enabled && seasonParam && episodeParam) {
+                        try {
+                            // Get imdbId for this torrent to lookup intro
+                            const episodeImdbId = dbEnabled ? await dbHelper.getImdbIdByHash(infoHash) : null;
+                            if (episodeImdbId && episodeImdbId.startsWith('tt')) {
+                                const introDataTB = await introSkip.lookupIntro(episodeImdbId, parseInt(seasonParam), parseInt(episodeParam));
+                                if (introDataTB && introDataTB.end_sec > 0) {
+                                    // Wrap in HLS proxy for real intro skipping
+                                    const encodedStream = encodeURIComponent(result);
+                                    result = `${workerOrigin}/introskip/hls.m3u8?stream=${encodedStream}&start=${introDataTB.start_sec}&end=${introDataTB.end_sec}`;
+                                    console.log(`⏩ [IntroSkip] Wrapped in HLS proxy: ${introDataTB.start_sec}s - ${introDataTB.end_sec}s`);
+                                }
+                            }
+                        } catch (introErr) {
+                            console.warn(`⏩ [IntroSkip] Error applying HLS proxy: ${introErr.message}`);
+                        }
+                    }
+
                     console.log(`[Torbox] Streaming: ${result}`);
                     return res.redirect(302, result);
 
