@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICV Custom Formatter</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a28;
+            --accent: #8b5cf6;
+            --accent-hover: #a78bfa;
+            --text-primary: #e4e4e7;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --border: #27272a;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--accent), #ec4899);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+        }
+
+        .panel-content {
+            padding: 1rem;
+        }
+
+        .preset-selector {
+            margin-bottom: 1rem;
+        }
+
+        .preset-selector label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .preset-selector select {
+            width: 100%;
+            padding: 0.6rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .template-field {
+            margin-bottom: 1rem;
+        }
+
+        .template-field label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .template-field textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .template-field textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .preview-container {
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .preview-label {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            margin-bottom: 0.4rem;
+        }
+
+        .stremio-card {
+            background: linear-gradient(180deg, #1a1a2e 0%, #16162a 100%);
+            border-radius: 6px;
+            padding: 0.75rem;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .stremio-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.4rem;
+        }
+
+        .stremio-description {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.4;
+            white-space: pre-line;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #ec4899);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .variables-ref {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+
+        .var-item {
+            background: var(--bg-tertiary);
+            padding: 0.3rem 0.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.65rem;
+            color: var(--accent);
+            cursor: pointer;
+        }
+
+        .var-item:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .section-title {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            margin: 0.75rem 0 0.4rem;
+            text-transform: uppercase;
+        }
+
+        .current-selection {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid var(--success);
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+            color: var(--success);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 ICV Custom Formatter</h1>
+        </header>
+
+        <div id="currentSelection" class="current-selection" style="display: none;">
+            ✓ Preset attuale: <span id="currentPresetName">-</span>
+        </div>
+
+        <div class="main-grid">
+            <!-- Left: Editor -->
+            <div class="panel">
+                <div class="panel-header">📝 Template Editor</div>
+                <div class="panel-content">
+                    <div class="preset-selector">
+                        <label>Preset</label>
+                        <select id="presetSelect">
+                            <optgroup label="📦 Preset Base">
+                                <option value="default">Default ICV</option>
+                                <option value="torrentio">Torrentio Style</option>
+                                <option value="minimal">Minimal</option>
+                                <option value="verbose">Verbose</option>
+                                <option value="italiano">Italiano Completo</option>
+                            </optgroup>
+                            <optgroup label="👥 Community">
+                                <option value="fra">Fra Style</option>
+                                <option value="dav">Dav Style (4K labels)</option>
+                                <option value="and">And Style (Decorativo)</option>
+                                <option value="lad">Lad Style (Clean)</option>
+                                <option value="pri">Pri Style (Premium)</option>
+                            </optgroup>
+                            <option value="custom">📝 Custom</option>
+                        </select>
+                    </div>
+
+                    <div class="template-field">
+                        <label>Template Nome</label>
+                        <textarea id="nameTemplate" rows="2"></textarea>
+                    </div>
+
+                    <div class="template-field">
+                        <label>Template Descrizione</label>
+                        <textarea id="descriptionTemplate" rows="5"></textarea>
+                    </div>
+
+                    <div class="preview-container">
+                        <div class="preview-label">Anteprima</div>
+                        <div class="stremio-card">
+                            <div class="stremio-name" id="previewName">-</div>
+                            <div class="stremio-description" id="previewDescription">-</div>
+                        </div>
+                    </div>
+
+                    <div class="button-row">
+                        <button class="btn btn-primary" id="saveBtn">💾 Salva e Chiudi</button>
+                        <button class="btn btn-secondary" id="cancelBtn">Annulla</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Variables -->
+            <div class="panel">
+                <div class="panel-header">📚 Variabili</div>
+                <div class="panel-content">
+                    <div class="section-title">Stream</div>
+                    <div class="variables-ref">
+                        <div class="var-item" onclick="insertVar('{stream.title}')">{stream.title}</div>
+                        <div class="var-item" onclick="insertVar('{stream.filename}')">{stream.filename}</div>
+                        <div class="var-item" onclick="insertVar('{stream.size::bytes}')">{stream.size::bytes}</div>
+                        <div class="var-item" onclick="insertVar('{stream.packSize::bytes}')">{stream.packSize::bytes}
+                        </div>
+                        <div class="var-item" onclick="insertVar('{stream.quality}')">{stream.quality}</div>
+                        <div class="var-item" onclick="insertVar('{stream.codec}')">{stream.codec}</div>
+                        <div class="var-item" onclick="insertVar('{stream.seeders}')">{stream.seeders}</div>
+                        <div class="var-item" onclick="insertVar('{stream.languages::join(\' | \')}')">
+                            {stream.languages}</div>
+                        <div class="var-item" onclick="insertVar('{stream.languageEmojis::join(\' \')}')">
+                            {stream.languageEmojis}</div>
+                        <div class="var-item" onclick="insertVar('{stream.releaseGroup}')">{stream.releaseGroup}</div>
+                        <div class="var-item" onclick="insertVar('{stream.visualTags::join(\' \')}')">
+                            {stream.visualTags}</div>
+                        <div class="var-item" onclick="insertVar('{stream.audioTags::join(\' \')}')">{stream.audioTags}
+                        </div>
+                        <div class="var-item" onclick="insertVar('{stream.season}')">{stream.season}</div>
+                        <div class="var-item" onclick="insertVar('{stream.episode}')">{stream.episode}</div>
+                    </div>
+
+                    <div class="section-title">Service</div>
+                    <div class="variables-ref">
+                        <div class="var-item" onclick="insertVar('{service.shortName}')">{service.shortName}</div>
+                        <div class="var-item" onclick="insertVar('{service.name}')">{service.name}</div>
+                        <div class="var-item" onclick="insertVar('{service.cached}')">
+                            {service.cached}</div>
+                    </div>
+
+                    <div class="section-title">Addon</div>
+                    <div class="variables-ref">
+                        <div class="var-item" onclick="insertVar('{addon.name}')">{addon.name}</div>
+                    </div>
+
+                    <div class="section-title">Sintassi</div>
+                    <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.6;">
+                        <code>::bytes</code> → Formatta bytes<br>
+                        <code>::upper/lower</code> → Maiuscolo/minuscolo<br>
+                        <code>::join(' ')</code> → Unisci array<br>
+                        <code>::exists["se"||"no"]</code> → Condizione<br>
+                        <code>::istrue["⚡"||"⏳"]</code> → Boolean<br>
+                        <code>::=1080p["FHD"||""]</code> → Comparazione
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock data per preview
+        const mockData = {
+            stream: {
+                title: "Il Trono Di Spade",
+                filename: "Trono.Di.Spade.S01E03.1080p.HEVC.mkv",
+                folderName: "Il.Trono.Di.Spade.S01",
+                size: 1624273183,
+                packSize: 15064597791,
+                quality: "1080p",
+                codec: "HEVC",
+                audio: "AC3",
+                source: "BDMux",
+                seeders: 26,
+                age: "2 years",
+                languages: ["Italian", "English"],
+                languageEmojis: ["🇮🇹", "🇬🇧"],
+                cached: true,
+                isPack: true,
+                releaseGroup: "BlackBit",
+                visualTags: ["HDR", "10bit"],
+                audioTags: ["5.1", "Surround"],
+                season: 1,
+                episode: 3,
+                indexer: "Knaben"
+            },
+            service: { id: "realdebrid", name: "Real-Debrid", shortName: "RD", cached: true },
+            addon: { name: "IlCorsaroViola", version: "3.0.0" }
+        };
+
+        // Preset templates
+        const PRESETS = {
+            default: {
+                name: `{service.shortName::exists["[{service.shortName}] "||""]}📺 {stream.title}`,
+                description: `{stream.quality} | 💾 {stream.size::bytes} | 👤 {stream.seeders} seeders`
+            },
+            torrentio: {
+                name: `{service.shortName::exists["[{service.shortName}"||""]}{service.cached::istrue["+]"||"]"]} ICV {stream.quality}`,
+                description: `{stream.filename}\n💾 {stream.size::bytes} {stream.packSize::>0["/ 📦 {stream.packSize::bytes}"||""]} 👤 {stream.seeders}\n{stream.languageEmojis::join(' ')}`
+            },
+            minimal: {
+                name: `{stream.quality} {stream.codec}`,
+                description: `{stream.size::bytes} • {stream.seeders} seeds`
+            },
+            verbose: {
+                name: `{service.cached::istrue["⚡"||"⏳"]} [{service.shortName}] {stream.quality} {stream.codec}`,
+                description: `📁 {stream.filename}\n💾 Ep: {stream.size::bytes}{stream.packSize::>0[" / Pack: {stream.packSize::bytes}"||""]}\n👤 {stream.seeders} • 🎬 {stream.source} • 🔊 {stream.audio}\n🌍 {stream.languages::join(' | ')}`
+            },
+            italiano: {
+                name: `{service.cached::istrue["⚡"||"⏳"]} {service.shortName::exists["[{service.shortName}]"||""]} {stream.quality} {stream.codec}`,
+                description: `📺 {stream.title}\n📁 {stream.filename}\n💾 {stream.size::bytes}{stream.isPack::istrue[" (Pack: {stream.packSize::bytes})"||""]}\n🌍 {stream.languageEmojis::join(' ')} | 👤 {stream.seeders} | ⏰ {stream.age}\n🎬 {stream.source} | 🔊 {stream.audio} | 🏷️ {stream.releaseGroup::exists["{stream.releaseGroup}"||"N/A"]}`
+            },
+            fra: {
+                name: `{service.cached::istrue["⚡️"||"⏳"]} {addon.name} {stream.quality::=1080p["FHD"||""]}{stream.quality::=720p["HD"||""]}{stream.quality::=2160p["4K"||""]}{stream.quality::exists[""||"UNK"]}`,
+                description: `📄 ❯ {stream.filename}\n{stream.languages::exists["🌎 ❯ {stream.languages::join(' • ')}"||""]}\n✨ ❯ {service.shortName::exists["{service.shortName}"||""]}{stream.releaseGroup::exists[" • {stream.releaseGroup}"||""]}\n{stream.quality::exists["🔥 ❯ {stream.quality}"||""]}{stream.visualTags::exists[" • {stream.visualTags::join(' • ')}"||""]}\n{stream.size::>0["💾 ❯ {stream.size::bytes}"||""]}{service.cached::isfalse[" / 👥 ❯ {stream.seeders}"||""]}`
+            },
+            dav: {
+                name: `{stream.quality::=2160p["🔥4K UHD"||""]}{stream.quality::=1080p["🚀 FHD"||""]}{stream.quality::=720p["💿 HD"||""]}{stream.quality::exists[""||"💩 Unknown"]}`,
+                description: `{stream.quality::exists["🎥 {stream.quality} "||""]}{stream.visualTags::exists["📺 {stream.visualTags::join(' | ')} "||""]}{stream.codec::exists["🎞️ {stream.codec} "||""]}\n{stream.audioTags::exists["🎧 {stream.audioTags::join(' | ')} "||""]}{stream.languageEmojis::exists["🗣️ {stream.languageEmojis::join(' / ')}"||""]}\n{stream.size::>0["📦 {stream.size::bytes} "||""]}{stream.seeders::>0["👥 {stream.seeders} "||""]}{stream.releaseGroup::exists["🏷️ {stream.releaseGroup} "||""]}\n{service.cached::istrue["⚡"||"⏳"]}{service.shortName::exists["{service.shortName} "||""]}🔍{addon.name}\n📄 {stream.filename}`
+            },
+            and: {
+                name: `{stream.title::exists["🎬 {stream.title}"||""]} S{stream.season}E{stream.episode}`,
+                description: `{stream.quality} {service.cached::istrue["/⚡"||"/⏳"]}\n─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─\n{stream.languageEmojis::exists["Lingue: {stream.languageEmojis::join(' | ')}"||""]}\nSpecifiche: {stream.quality}{stream.visualTags::exists[" | 📺 {stream.visualTags::join(' ')}"||""]}{stream.audioTags::exists[" | 🔊 {stream.audioTags::join(', ')}"||""]}\n─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─\n📂 {stream.size::>0["{stream.size::bytes}"||""]}{service.name::exists[" | ☁️ {service.name}"||""]}{addon.name::exists[" | 🛰️ {addon.name}"||""]}`
+            },
+            lad: {
+                name: `{stream.quality::=2160p["🖥️ 4K"||""]}{stream.quality::=1080p["🖥️ 1080p"||""]}{stream.quality::=720p["🖥️ 720p"||""]}{stream.quality::exists[""||"🖥️ Unknown"]}`,
+                description: `{stream.title::exists["🎟️ {stream.title}"||""]}\n📜 S{stream.season}E{stream.episode}\n{stream.quality::exists["🎥 {stream.quality} "||""]}{stream.codec::exists["🎞️ {stream.codec} "||""]}{stream.audioTags::exists["🎧 {stream.audioTags::join(' | ')}"||""]}\n{stream.size::>0["📦 {stream.size::bytes}"||""]}\n🔗 {addon.name}\n{stream.languageEmojis::exists["🌐 {stream.languageEmojis::join(' ')}"||""]}`
+            },
+            pri: {
+                name: `{service.shortName::exists["[{service.shortName}"||""]}{service.cached::istrue["⚡️☁️"||"❌️☁️"]}{service.shortName::exists["]"||""]}\n{stream.quality::=2160p["4K🔥UHD"||""]}{stream.quality::=1080p["FHD🚀1080p"||""]}{stream.quality::=720p["HD💿720p"||""]}{stream.quality::=480p["SD📺"||""]}{stream.quality::exists[""||"Unknown💩"]}\n[{addon.name}]`,
+                description: `{stream.title::exists["🎬 {stream.title} "||""]}\n{stream.quality::exists["💎 {stream.quality}"||""]}{stream.codec::exists[" | 🎞️ {stream.codec}"||""]}{stream.visualTags::exists[" | 🔆 {stream.visualTags::join(' | ')}"||""]}\n{stream.audioTags::exists["🎧 {stream.audioTags::join(' | ')} "||""]}{stream.languageEmojis::exists["| 🗣️ {stream.languageEmojis::join(' / ')}"||""]}\n{stream.size::>0["📁 {stream.size::bytes} "||""]}{stream.releaseGroup::exists["| 🏷️ {stream.releaseGroup} "||""]}\n📄 ▶️{stream.filename}◀️`
+            },
+            custom: { name: '', description: '' }
+        };
+
+        // Parser functions (same as formatter.cjs)
+        function formatBytes(bytes, decimals = 2) {
+            if (!bytes || bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
+        }
+
+        function applyModifier(value, modifier, args = null) {
+            if (value === null || value === undefined) return null;
+            switch (modifier) {
+                case 'bytes': return formatBytes(value, 2);
+                case 'upper': return String(value).toUpperCase();
+                case 'lower': return String(value).toLowerCase();
+                case 'join': return Array.isArray(value) ? value.join(args || ', ') : value;
+                default: return value;
+            }
+        }
+
+        function evaluateCondition(value, condition, threshold = null) {
+            // Pattern matching with ~
+            if (condition.startsWith('~')) {
+                const pattern = condition.substring(1);
+                return String(value || '').toLowerCase().includes(pattern.toLowerCase());
+            }
+            // Comparison operators
+            const opMatch = condition.match(/^([><!=]+)(.+)$/);
+            if (opMatch) {
+                const op = opMatch[1], thresh = opMatch[2];
+                switch (op) {
+                    case '>': return Number(value) > Number(thresh);
+                    case '=': return String(value) === String(thresh);
+                    case '!=': return String(value) !== String(thresh);
+                }
+            }
+            switch (condition) {
+                case 'exists': return value !== null && value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0);
+                case 'istrue': return value === true;
+                case 'isfalse': return value === false;
+                default: return true;
+            }
+        }
+
+        function getNestedValue(data, path) {
+            const parts = path.split('.');
+            let value = data;
+            for (const part of parts) {
+                if (value === null || value === undefined) return null;
+                value = value[part];
+            }
+            return value;
+        }
+
+        function parseVariable(fullMatch, data, recursiveParser) {
+            const pattern = /^\{([a-zA-Z_]+)\.([a-zA-Z_]+)(?:::([a-zA-Z0-9><!=]+))?(?:\("([^"]*)"\)|\('([^']*)'\))?(?:\["([^"]*)"\|\|"([^"]*)"\])?\}$/;
+            const match = fullMatch.match(pattern);
+            if (!match) return fullMatch;
+
+            const namespace = match[1], variable = match[2], modifier = match[3] || null;
+            const modifierArg = match[4] || match[5] || null;
+            const trueValue = match[6], falseValue = match[7];
+
+            let value = getNestedValue(data, `${namespace}.${variable}`);
+
+            if (trueValue !== undefined) {
+                let condition = 'exists', threshold = null;
+                if (modifier) {
+                    const opMatch = modifier.match(/^([><!=]+)(.+)$/);
+                    if (opMatch) { condition = opMatch[1]; threshold = opMatch[2]; }
+                    else condition = modifier;
+                }
+                const result = evaluateCondition(value, condition, threshold);
+                let output = result ? trueValue : (falseValue || '');
+                return recursiveParser(output, data);
+            }
+
+            if (modifier && !modifier.match(/^[><!=]/)) {
+                value = applyModifier(value, modifier, modifierArg);
+            }
+            if (Array.isArray(value)) value = value.join(', ');
+            return value ?? '';
+        }
+
+        function parseTemplate(template, data, maxDepth = 10) {
+            if (!template || maxDepth <= 0) return template || '';
+            const pattern = /\{[a-zA-Z_]+\.[a-zA-Z_]+(?:::[a-zA-Z0-9><!=]+)?(?:\("[^"]*"\)|\('[^']*'\))?(?:\["[^"]*"\|\|"[^"]*"\])?\}/g;
+            let result = template, lastResult = null;
+            while (result !== lastResult && maxDepth > 0) {
+                lastResult = result; maxDepth--;
+                const matches = result.match(pattern);
+                if (!matches) break;
+                for (const m of matches) {
+                    const parsed = parseVariable(m, data, (t, d) => parseTemplate(t, d, maxDepth - 1));
+                    result = result.replace(m, parsed);
+                }
+            }
+            return result.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+        }
+
+        // UI Elements
+        const presetSelect = document.getElementById('presetSelect');
+        const nameTemplate = document.getElementById('nameTemplate');
+        const descriptionTemplate = document.getElementById('descriptionTemplate');
+        const previewName = document.getElementById('previewName');
+        const previewDescription = document.getElementById('previewDescription');
+        const currentSelection = document.getElementById('currentSelection');
+        const currentPresetName = document.getElementById('currentPresetName');
+
+        let selectedPreset = 'default';
+
+        function updatePreview() {
+            try {
+                previewName.textContent = parseTemplate(nameTemplate.value, mockData) || '(vuoto)';
+                previewDescription.textContent = parseTemplate(descriptionTemplate.value, mockData) || '(vuoto)';
+            } catch (e) {
+                previewName.textContent = 'Errore: ' + e.message;
+            }
+        }
+
+        function loadPreset(presetId) {
+            if (presetId === 'custom') return;
+            const preset = PRESETS[presetId];
+            if (preset) {
+                nameTemplate.value = preset.name;
+                descriptionTemplate.value = preset.description;
+                selectedPreset = presetId;
+                updatePreview();
+            }
+        }
+
+        function insertVar(variable) {
+            const active = document.activeElement;
+            if (active === nameTemplate || active === descriptionTemplate) {
+                const start = active.selectionStart;
+                active.value = active.value.substring(0, start) + variable + active.value.substring(active.selectionEnd);
+                active.selectionStart = active.selectionEnd = start + variable.length;
+                active.focus();
+            } else {
+                descriptionTemplate.value += variable;
+            }
+            presetSelect.value = 'custom';
+            selectedPreset = 'custom';
+            updatePreview();
+        }
+
+        // Event listeners
+        presetSelect.addEventListener('change', e => loadPreset(e.target.value));
+        nameTemplate.addEventListener('input', () => { presetSelect.value = 'custom'; selectedPreset = 'custom'; updatePreview(); });
+        descriptionTemplate.addEventListener('input', () => { presetSelect.value = 'custom'; selectedPreset = 'custom'; updatePreview(); });
+
+        // Save button
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            const config = {
+                preset: selectedPreset,
+                customName: selectedPreset === 'custom' ? nameTemplate.value : null,
+                customDesc: selectedPreset === 'custom' ? descriptionTemplate.value : null
+            };
+
+            if (window.opener) {
+                window.opener.postMessage({ type: 'formatter-config', config }, '*');
+                window.close();
+            } else {
+                // Standalone mode - show config
+                alert('Config: ' + JSON.stringify(config, null, 2));
+            }
+        });
+
+        // Cancel button
+        document.getElementById('cancelBtn').addEventListener('click', () => {
+            if (window.opener) window.close();
+        });
+
+        // Load initial config from URL or opener
+        function init() {
+            // Check if config passed in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const preset = urlParams.get('preset');
+            if (preset && PRESETS[preset]) {
+                presetSelect.value = preset;
+                loadPreset(preset);
+                currentSelection.style.display = 'block';
+                currentPresetName.textContent = preset;
+            } else {
+                loadPreset('default');
+            }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
