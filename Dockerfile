@@ -3,8 +3,8 @@
 
 FROM node:20-slim
 
-# Installa git per clonare il repo
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+# Installa git e ffmpeg (per ffprobe necessario a IntroSkip)
+RUN apt-get update && apt-get install -y git ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Imposta la directory di lavoro
 WORKDIR /app
