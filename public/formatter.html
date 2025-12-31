@@ -359,33 +359,103 @@
     </div>
 
     <script>
-        // Mock data per preview
+        // Mock data per preview - Complete AIOStreams fields
         const mockData = {
             stream: {
+                // Basic info
                 title: "Il Trono Di Spade",
-                filename: "Trono.Di.Spade.S01E03.1080p.HEVC.mkv",
-                folderName: "Il.Trono.Di.Spade.S01",
+                filename: "Il.Trono.Di.Spade.S01E03.1080p.BluRay.HEVC.DTS-HD.MA.ITA.ENG-BlackBit.mkv",
+                folderName: "Il.Trono.Di.Spade.S01.Complete.1080p.BluRay",
                 size: 1624273183,
+                folderSize: 15064597791,
                 packSize: 15064597791,
-                quality: "1080p",
+                library: false,
+
+                // Quality info (AIOStreams fields)
+                quality: "BluRay",
+                resolution: "1080p",
+                encode: "HEVC",
                 codec: "HEVC",
-                audio: "AC3",
-                source: "BDMux",
-                seeders: 26,
-                age: "2 years",
+
+                // Languages
                 languages: ["Italian", "English"],
+                uLanguages: ["Italian"],
                 languageEmojis: ["🇮🇹", "🇬🇧"],
+                uLanguageEmojis: ["🇮🇹"],
+                languageCodes: ["IT", "EN"],
+                uLanguageCodes: ["IT"],
+                smallLanguageCodes: ["ɪᴛ", "ᴇɴ"],
+
+                // Tags
+                visualTags: ["HDR", "10bit"],
+                audioTags: ["DTS-HD MA", "5.1"],
+                audioChannels: ["5.1"],
+                releaseGroup: "BlackBit",
+
+                // Episode info
+                year: "2011",
+                seasons: [1],
+                season: 1,
+                formattedSeasons: "S01",
+                episodes: [3],
+                episode: 3,
+                formattedEpisodes: "E03",
+                seasonEpisode: ["S01", "E03"],
+                seasonPack: true,
+
+                // Metadata
+                regexMatched: null,
+                edition: null,
+                remastered: false,
+                repack: false,
+                uncensored: false,
+                unrated: false,
+                upscaled: false,
+                network: null,
+                container: "mkv",
+                extension: "mkv",
+
+                // Torrent info
+                seeders: 26,
+                private: false,
+                age: "2y",
+                ageHours: 17520,
+                duration: 3540,
+                infoHash: "abc123def456",
+
+                // Stream type
+                type: "Debrid",
+                message: null,
+                proxied: false,
+                seadex: false,
+                seadexBest: false,
+
+                // ICV specific
+                source: "BluRay",
+                audio: "DTS-HD MA",
                 cached: true,
                 isPack: true,
-                releaseGroup: "BlackBit",
-                visualTags: ["HDR", "10bit"],
-                audioTags: ["5.1", "Surround"],
-                season: 1,
-                episode: 3,
                 indexer: "Knaben"
             },
-            service: { id: "realdebrid", name: "Real-Debrid", shortName: "RD", cached: true },
-            addon: { name: "IlCorsaroViola", version: "3.0.0" }
+            config: {
+                addonName: "IlCorsaroViola"
+            },
+            service: {
+                id: "realdebrid",
+                name: "Real-Debrid",
+                shortName: "RD",
+                cached: true
+            },
+            addon: {
+                name: "IlCorsaroViola",
+                version: "3.0.0",
+                presetId: "pri",
+                manifestUrl: null
+            },
+            tools: {
+                newLine: "\n",
+                removeLine: ""
+            }
         };
 
         // Preset templates
@@ -735,12 +805,24 @@
         function init() {
             // Check if config passed in URL
             const urlParams = new URLSearchParams(window.location.search);
-            const preset = urlParams.get('preset');
-            if (preset && PRESETS[preset]) {
+            const preset = urlParams.get('preset') || 'default';
+            const customName = decodeURIComponent(urlParams.get('name') || '');
+            const customDesc = decodeURIComponent(urlParams.get('desc') || '');
+
+            // If we have a custom config, load it
+            if (preset === 'custom' && (customName || customDesc)) {
+                presetSelect.value = 'custom';
+                nameTemplate.value = customName;
+                descriptionTemplate.value = customDesc;
+                selectedPreset = 'custom';
+                currentSelection.style.display = 'block';
+                currentPresetName.textContent = 'Custom (salvato)';
+                updatePreview();
+            } else if (preset && PRESETS[preset]) {
                 presetSelect.value = preset;
                 loadPreset(preset);
                 currentSelection.style.display = 'block';
-                currentPresetName.textContent = preset;
+                currentPresetName.textContent = preset.charAt(0).toUpperCase() + preset.slice(1);
             } else {
                 loadPreset('default');
             }
