@@ -55,7 +55,7 @@ function decodeHtmlEntities(text) {
 // ✅ DEBUG MODE
 const DEBUG_MODE = false;
 
-// ✅ Custom Formatter Helper
+// ✅ Custom Formatter Helper - Full AIOStreams compatible
 function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', isCached = false) {
     if (!userConfig || !userConfig.formatter_preset) return stream;
 
@@ -74,10 +74,12 @@ function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', is
 
         if (!templates) return stream;
 
-        // Extract additional data from filename if not present
         const filename = result.filename || result.title || '';
+        const fn = filename.toLowerCase();
 
-        // Helper to extract patterns from filename
+        // ============================================
+        // PATTERN EXTRACTION HELPERS
+        // ============================================
         const extractPattern = (str, patterns) => {
             for (const [key, regex] of Object.entries(patterns)) {
                 if (regex.test(str)) return key;
@@ -93,86 +95,264 @@ function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', is
             return matches;
         };
 
-        // Simplified patterns for quick extraction
+        // ============================================
+        // ALL PATTERNS (AIOStreams-compatible)
+        // ============================================
         const visualPatterns = {
             'HDR10+': /hdr.?10.?\+|hdr.?10.?plus/i,
             'HDR10': /hdr.?10(?!.?\+)/i,
             'HDR': /\bhdr\b(?!.?10)/i,
             'DV': /dolby.?vision|dovi|\bdv\b/i,
             '10bit': /10.?bit/i,
-            'IMAX': /\bimax\b/i
+            'IMAX': /\bimax\b/i,
+            '3D': /\b3d\b/i,
+            'SDR': /\bsdr\b/i
         };
 
         const audioPatterns = {
             'Atmos': /\batmos\b/i,
-            'DD+': /dd\+|ddp|e.?ac.?3/i,
-            'DD': /\bdd\b|dolby.?digital|ac.?3/i,
+            'TrueHD': /true.?hd/i,
             'DTS-HD MA': /dts.?hd.?ma/i,
             'DTS-HD': /dts.?hd(?!.?ma)/i,
-            'DTS': /\bdts\b(?!.?hd)/i,
-            'TrueHD': /true.?hd/i,
-            '5.1': /5\.?1/i,
+            'DTS-ES': /dts.?es/i,
+            'DTS': /\bdts\b(?!.?hd|.?es)/i,
+            'DD+': /dd\+|ddp|e.?ac.?3/i,
+            'DD': /\bdd\b|dolby.?digital(?!.?\+)|(?<!e.?)ac.?3/i,
+            'FLAC': /\bflac\b/i,
+            'OPUS': /\bopus\b/i,
+            'AAC': /\baac\b/i
+        };
+
+        const audioChannelPatterns = {
             '7.1': /7\.?1/i,
-            'AAC': /\baac\b/i,
-            'FLAC': /\bflac\b/i
+            '5.1': /5\.?1/i,
+            '2.0': /2\.?0|stereo/i
         };
 
         const codecPatterns = {
             'HEVC': /hevc|x.?265|h.?265/i,
             'AVC': /avc|x.?264|h.?264/i,
-            'AV1': /\bav1\b/i
+            'AV1': /\bav1\b/i,
+            'XviD': /xvid/i,
+            'DivX': /divx/i
+        };
+
+        const resolutionPatterns = {
+            '2160p': /2160p|4k|uhd/i,
+            '1440p': /1440p|2k|qhd/i,
+            '1080p': /1080p/i,
+            '720p': /720p/i,
+            '576p': /576p/i,
+            '480p': /480p/i,
+            '360p': /360p/i
         };
 
         const qualityPatterns = {
-            '2160p': /2160p|4k|uhd/i,
-            '1080p': /1080p|fhd/i,
-            '720p': /720p|hd(?!r)/i,
-            '480p': /480p|sd/i
+            'Remux': /\bremux\b/i,
+            'BluRay': /blu.?ray|bdrip|brrip/i,
+            'WEB-DL': /web.?dl/i,
+            'WEBRip': /web.?rip/i,
+            'HDRip': /hd.?rip/i,
+            'DVDRip': /dvd.?rip/i,
+            'HDTV': /hdtv/i,
+            'PDTV': /pdtv/i,
+            'CAM': /\bcam\b|camrip/i,
+            'TS': /\bts\b|telesync/i,
+            'TC': /\btc\b|telecine/i,
+            'SCR': /\bscr\b|screener/i
         };
 
-        const languagePatterns = {
-            '🇮🇹': /\bita(lian)?\b|italiano/i,
-            '🇬🇧': /\beng(lish)?\b/i,
-            '🇫🇷': /\bfre(nch)?\b|fra(ncese)?/i,
-            '🇩🇪': /\bger(man)?\b|deu(tsch)?/i,
-            '🇪🇸': /\bspa(nish)?\b|esp(añol)?/i
+        const editionPatterns = {
+            'Extended': /extended|ext.?cut/i,
+            'Theatrical': /theatrical/i,
+            'Director': /director.?s?.?cut|dc\b/i,
+            'Ultimate': /ultimate/i,
+            'Anniversary': /anniversary/i,
+            'IMAX': /imax.?(edition)?/i,
+            'Remastered': /remaster(ed)?/i,
+            'Collectors': /collector.?s?/i,
+            'Uncut': /uncut/i,
+            'Diamond': /diamond/i
         };
 
-        // Build data object for template parsing
+        const networkPatterns = {
+            'Netflix': /\bnetflix\b|nf\b/i,
+            'Amazon': /\bamazon\b|amzn\b/i,
+            'HBO': /\bhbo\b|hmax\b/i,
+            'Disney+': /\bdisney\b|dsnp\b|d\+/i,
+            'Apple TV+': /\batv\b|atvp\b/i,
+            'Hulu': /\bhulu\b/i,
+            'Paramount+': /\bpmtp\b|paramount\+?/i
+        };
+
+        // Extract all fields from filename
+        const resolution = result.resolution || extractPattern(filename, resolutionPatterns) || '';
+        const quality = result.quality || extractPattern(filename, qualityPatterns) || '';
+        const encode = result.codec || result.videoCodec || extractPattern(filename, codecPatterns) || '';
+        const visualTags = result.visualTags?.length ? result.visualTags : extractMultiple(filename, visualPatterns);
+        const audioTags = result.audioTags?.length ? result.audioTags : extractMultiple(filename, audioPatterns);
+        const audioChannels = extractMultiple(filename, audioChannelPatterns);
+        const edition = extractPattern(filename, editionPatterns) || null;
+        const network = extractPattern(filename, networkPatterns) || null;
+
+        // Extract year from filename
+        const yearMatch = filename.match(/\b(19|20)\d{2}\b/);
+        const year = yearMatch ? yearMatch[0] : (result.year || null);
+
+        // Extract container/extension
+        const extMatch = filename.match(/\.(mkv|mp4|avi|mov|wmv|flv|webm)$/i);
+        const container = extMatch ? extMatch[1].toLowerCase() : null;
+        const extension = container;
+
+        // Season/Episode formatting
+        const season = result.season || null;
+        const episode = result.episode || null;
+        const seasons = season ? [season] : [];
+        const episodes = episode ? [episode] : [];
+        const pad = (n) => n?.toString().padStart(2, '0') || '';
+        const formattedSeasons = season ? `S${pad(season)}` : null;
+        const formattedEpisodes = episode ? `E${pad(episode)}` : null;
+        const seasonEpisode = [formattedSeasons, formattedEpisodes].filter(Boolean);
+        const seasonPack = result.isPack || /complete|stagione|season.?pack/i.test(fn);
+
+        // Flags (AIOStreams)
+        const remastered = /remaster(ed)?/i.test(fn);
+        const repack = /\brepack\b/i.test(fn);
+        const uncensored = /uncensored/i.test(fn);
+        const unrated = /unrated/i.test(fn);
+        const upscaled = /upscal(ed|e)?|\bai\b/i.test(fn);
+
+        // Language handling
+        const languageMap = {
+            'Italian': '🇮🇹', 'English': '🇬🇧', 'French': '🇫🇷', 'German': '🇩🇪',
+            'Spanish': '🇪🇸', 'Portuguese': '🇵🇹', 'Russian': '🇷🇺', 'Japanese': '🇯🇵',
+            'Korean': '🇰🇷', 'Chinese': '🇨🇳', 'Arabic': '🇸🇦', 'Hindi': '🇮🇳',
+            'Multi': '🌎', 'ITA': '🇮🇹', 'ENG': '🇬🇧', 'FRA': '🇫🇷', 'GER': '🇩🇪'
+        };
+        const langCodeMap = {
+            'Italian': 'IT', 'English': 'EN', 'French': 'FR', 'German': 'DE',
+            'Spanish': 'ES', 'Portuguese': 'PT', 'Russian': 'RU', 'Japanese': 'JA',
+            'Multi': 'MUL', 'ITA': 'IT', 'ENG': 'EN'
+        };
+        const SMALL_CAPS = { A: 'ᴀ', B: 'ʙ', C: 'ᴄ', D: 'ᴅ', E: 'ᴇ', F: 'ꜰ', G: 'ɢ', H: 'ʜ', I: 'ɪ', J: 'ᴊ', K: 'ᴋ', L: 'ʟ', M: 'ᴍ', N: 'ɴ', O: 'ᴏ', P: 'ᴘ', R: 'ʀ', S: 'ꜱ', T: 'ᴛ', U: 'ᴜ', V: 'ᴠ', W: 'ᴡ', Y: 'ʏ', Z: 'ᴢ' };
+        const makeSmall = (s) => s.split('').map(c => SMALL_CAPS[c.toUpperCase()] || c).join('');
+
+        const languages = result.languages?.length ? result.languages :
+            extractMultiple(filename, { Italian: /\bita(lian)?\b/i, English: /\beng(lish)?\b/i, French: /\bfre(nch)?\b/i });
+        const languageEmojis = result.languageEmojis?.length ? result.languageEmojis :
+            languages.map(l => languageMap[l] || l);
+        const languageCodes = languages.map(l => langCodeMap[l] || l.substring(0, 2).toUpperCase());
+        const smallLanguageCodes = languageCodes.map(c => makeSmall(c));
+
+        // Age formatting
+        const formatAge = (age) => {
+            if (!age) return null;
+            if (typeof age === 'number') {
+                if (age < 24) return `${age}h`;
+                if (age < 24 * 7) return `${Math.round(age / 24)}d`;
+                if (age < 24 * 30) return `${Math.round(age / (24 * 7))}w`;
+                return `${Math.round(age / (24 * 30))}mo`;
+            }
+            return age;
+        };
+
+        // Build complete data object
         const data = {
+            config: {
+                addonName: 'IlCorsaroViola'
+            },
             stream: {
-                title: result.title || result.filename || '',
+                // Basic
                 filename: result.filename || result.title || '',
                 folderName: result.folderName || '',
+                title: result.title || result.filename || '',
                 size: result.matchedFileSize || result.size || 0,
-                packSize: result.packSize || result.size || 0,
-                quality: result.quality || result.resolution || extractPattern(filename, qualityPatterns) || '',
-                resolution: result.resolution || result.quality || extractPattern(filename, qualityPatterns) || '',
-                codec: result.codec || result.videoCodec || extractPattern(filename, codecPatterns) || '',
-                audio: result.audioCodec || '',
-                source: result.source || '',
-                seeders: result.seeders || 0,
-                age: result.uploadTime || result.age || '',
-                languages: result.languages || [],
-                languageEmojis: result.languageEmojis?.length ? result.languageEmojis : extractMultiple(filename, languagePatterns),
-                cached: isCached,
-                isPack: result.isPack || false,
+                folderSize: result.packSize || result.folderSize || 0,
+                library: false,
+
+                // Quality info
+                quality: quality,
+                resolution: resolution,
+                encode: encode,
+                codec: encode,
+
+                // Languages (all variants)
+                languages: languages,
+                uLanguages: languages,
+                languageEmojis: languageEmojis,
+                uLanguageEmojis: languageEmojis,
+                languageCodes: languageCodes,
+                uLanguageCodes: languageCodes,
+                smallLanguageCodes: smallLanguageCodes,
+                uSmallLanguageCodes: smallLanguageCodes,
+
+                // Tags
+                visualTags: visualTags,
+                audioTags: audioTags,
+                audioChannels: audioChannels,
                 releaseGroup: result.groupTag || result.releaseGroup || result.group || '',
-                visualTags: result.visualTags?.length ? result.visualTags : extractMultiple(filename, visualPatterns),
-                audioTags: result.audioTags?.length ? result.audioTags : extractMultiple(filename, audioPatterns),
-                season: result.season || '',
-                episode: result.episode || '',
+                regexMatched: null,
+
+                // Episode info
+                year: year,
+                seasons: seasons,
+                season: season,
+                formattedSeasons: formattedSeasons,
+                episodes: episodes,
+                episode: episode,
+                formattedEpisodes: formattedEpisodes,
+                seasonEpisode: seasonEpisode,
+                seasonPack: seasonPack,
+
+                // Metadata
+                edition: edition,
+                remastered: remastered,
+                repack: repack,
+                uncensored: uncensored,
+                unrated: unrated,
+                upscaled: upscaled,
+                network: network,
+                container: container,
+                extension: extension,
+
+                // Torrent info
+                seeders: result.seeders || 0,
+                private: false,
+                age: formatAge(result.uploadTime || result.ageHours) || result.age || '',
+                ageHours: result.ageHours || null,
+                duration: result.duration || 0,
+                infoHash: result.infoHash || null,
+
+                // Stream type
+                type: isCached ? 'Debrid' : (result.type || 'p2p'),
+                message: null,
+                proxied: false,
+                seadex: false,
+                seadexBest: false,
+
+                // ICV specific backwards compat
+                source: quality || result.source || '',
+                audio: audioTags.length ? audioTags[0] : '',
+                cached: isCached,
+                isPack: seasonPack,
+                packSize: result.packSize || result.size || 0,
                 indexer: result.provider || result.source || ''
             },
             service: {
                 id: serviceName.toLowerCase(),
-                name: serviceName === 'RD' ? 'Real-Debrid' : (serviceName === 'TB' ? 'Torbox' : serviceName),
+                name: serviceName === 'RD' ? 'Real-Debrid' : (serviceName === 'TB' ? 'Torbox' : (serviceName === 'AD' ? 'AllDebrid' : serviceName)),
                 shortName: serviceName,
                 cached: isCached
             },
             addon: {
                 name: 'IlCorsaroViola',
-                version: '3.0.0'
+                version: '3.0.0',
+                presetId: preset,
+                manifestUrl: null
+            },
+            tools: {
+                newLine: '\n',
+                removeLine: ''
             }
         };
 
