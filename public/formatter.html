@@ -786,7 +786,7 @@
         nameTemplate.addEventListener('input', () => { presetSelect.value = 'custom'; selectedPreset = 'custom'; updatePreview(); });
         descriptionTemplate.addEventListener('input', () => { presetSelect.value = 'custom'; selectedPreset = 'custom'; updatePreview(); });
 
-        // Save button
+        // Save button - uses localStorage for cross-origin compatibility
         document.getElementById('saveBtn').addEventListener('click', () => {
             const config = {
                 preset: selectedPreset,
@@ -794,13 +794,21 @@
                 customDesc: selectedPreset === 'custom' ? descriptionTemplate.value : null
             };
 
+            // Save to localStorage (works cross-origin within same domain)
+            localStorage.setItem('formatter_config', JSON.stringify(config));
+            localStorage.setItem('formatter_config_timestamp', Date.now().toString());
+
+            // Also try postMessage as backup
             if (window.opener) {
-                window.opener.postMessage({ type: 'formatter-config', config }, '*');
-                window.close();
-            } else {
-                // Standalone mode - show config
-                alert('Config: ' + JSON.stringify(config, null, 2));
+                try {
+                    window.opener.postMessage({ type: 'formatter-config', config }, '*');
+                } catch (e) {
+                    console.warn('postMessage failed:', e);
+                }
             }
+
+            alert('✅ Formatter salvato! Torna alla pagina principale per vedere le modifiche.');
+            window.close();
         });
 
         // Cancel button
