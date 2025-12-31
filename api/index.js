@@ -185,8 +185,8 @@ function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', is
             'Paramount+': /\bpmtp\b|paramount\+?/i
         };
 
-        // Extract all fields from filename
-        const resolution = result.resolution || extractPattern(filename, resolutionPatterns) || '';
+        // Extract all fields from filename (normalizeResolution is defined below after language handling)
+        const rawResolution = result.resolution || extractPattern(filename, resolutionPatterns) || '';
         const quality = result.quality || extractPattern(filename, qualityPatterns) || '';
         const encode = result.codec || result.videoCodec || extractPattern(filename, codecPatterns) || '';
         const visualTags = result.visualTags?.length ? result.visualTags : extractMultiple(filename, visualPatterns);
@@ -227,11 +227,17 @@ function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', is
             'Italian': '🇮🇹', 'English': '🇬🇧', 'French': '🇫🇷', 'German': '🇩🇪',
             'Spanish': '🇪🇸', 'Portuguese': '🇵🇹', 'Russian': '🇷🇺', 'Japanese': '🇯🇵',
             'Korean': '🇰🇷', 'Chinese': '🇨🇳', 'Arabic': '🇸🇦', 'Hindi': '🇮🇳',
+            'Thai': '🇹🇭', 'Vietnamese': '🇻🇳', 'Indonesian': '🇮🇩', 'Turkish': '🇹🇷',
+            'Polish': '🇵🇱', 'Dutch': '🇳🇱', 'Swedish': '🇸🇪', 'Norwegian': '🇳🇴',
+            'Danish': '🇩🇰', 'Finnish': '🇫🇮', 'Greek': '🇬🇷', 'Czech': '🇨🇿',
+            'Hungarian': '🇭🇺', 'Romanian': '🇷🇴', 'Bulgarian': '🇧🇬', 'Ukrainian': '🇺🇦',
+            'Hebrew': '🇮🇱', 'Persian': '🇮🇷', 'Malay': '🇲🇾', 'Latino': '💃🏻',
             'Multi': '🌎', 'ITA': '🇮🇹', 'ENG': '🇬🇧', 'FRA': '🇫🇷', 'GER': '🇩🇪'
         };
         const langCodeMap = {
             'Italian': 'IT', 'English': 'EN', 'French': 'FR', 'German': 'DE',
             'Spanish': 'ES', 'Portuguese': 'PT', 'Russian': 'RU', 'Japanese': 'JA',
+            'Korean': 'KO', 'Chinese': 'ZH', 'Arabic': 'AR', 'Hindi': 'HI',
             'Multi': 'MUL', 'ITA': 'IT', 'ENG': 'EN'
         };
         // Small caps with mathematical monospace digits (same as AIOStreams)
@@ -243,12 +249,32 @@ function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', is
         };
         const makeSmall = (s) => s.split('').map(c => SMALL_CAPS[c.toUpperCase()] || c).join('');
 
+        // Resolution normalizer (AIOStreams-identical: always returns standardized format like "2160p")
+        const normalizeResolution = (res) => {
+            if (!res) return null;
+            const r = res.toLowerCase().replace(/\s/g, '');
+            if (/2160|4k|uhd/.test(r)) return '2160p';
+            if (/1440|2k|qhd/.test(r)) return '1440p';
+            if (/1080|fhd/.test(r)) return '1080p';
+            if (/720|hd(?!r)/.test(r)) return '720p';
+            if (/576/.test(r)) return '576p';
+            if (/480|sd/.test(r)) return '480p';
+            if (/360/.test(r)) return '360p';
+            return res; // Return as-is if not recognized
+        };
+
         const languages = result.languages?.length ? result.languages :
-            extractMultiple(filename, { Italian: /\bita(lian)?\b/i, English: /\beng(lish)?\b/i, French: /\bfre(nch)?\b/i });
+            extractMultiple(filename, { Italian: /\bita(lian)?\b/i, English: /\beng(lish)?\b/i, French: /\bfre(nch)?\b/i, German: /\bger(man)?\b|deu(tsch)?\b/i, Spanish: /\bspa(nish)?\b/i, Multi: /\bmulti\b/i });
         const languageEmojis = result.languageEmojis?.length ? result.languageEmojis :
             languages.map(l => languageMap[l] || l);
         const languageCodes = languages.map(l => langCodeMap[l] || l.substring(0, 2).toUpperCase());
         const smallLanguageCodes = languageCodes.map(c => makeSmall(c));
+
+        // wedontknowwhatakilometeris: AIOStreams joke field - replaces 🇬🇧 with 🇺🇸🦅 for Americans
+        const wedontknowwhatakilometeris = languageEmojis.map(e => e.replace('🇬🇧', '🇺🇸🦅'));
+
+        // Apply normalizeResolution to raw extracted resolution
+        const resolution = normalizeResolution(rawResolution) || rawResolution;
 
         // Age formatting
         const formatAge = (age) => {
@@ -291,6 +317,8 @@ function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', is
                 uLanguageCodes: languageCodes,
                 smallLanguageCodes: smallLanguageCodes,
                 uSmallLanguageCodes: smallLanguageCodes,
+                wedontknowwhatakilometeris: wedontknowwhatakilometeris,
+                uWedontknowwhatakilometeris: wedontknowwhatakilometeris,
 
                 // Tags
                 visualTags: visualTags,
