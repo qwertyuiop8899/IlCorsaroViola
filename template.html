@@ -732,16 +732,38 @@
                 </div>
                 <div
                     style="margin-bottom: 15px; padding: 12px 15px; background: rgba(10, 10, 26, 0.4); border-radius: 8px; border: 1px solid rgba(147, 51, 234, 0.2);">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span>🎨 Custom Formatter</span>
-                        <button id="formatter_button" type="button"
-                            style="padding: 6px 12px; background: linear-gradient(135deg, #8b5cf6, #ec4899); border: none; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
-                            Configura
-                        </button>
-                        <small id="formatter_status" style="margin-left: auto; color: #9ca3af;">Preset: Default</small>
-                        <input type="hidden" id="formatter_preset" value="default">
-                        <input type="hidden" id="formatter_custom_name" value="">
-                        <input type="hidden" id="formatter_custom_desc" value="">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span>🎨 Formatter</span>
+                        <select id="formatter_preset"
+                            style="padding: 6px 12px; background: rgba(30, 30, 50, 0.8); border: 1px solid rgba(147, 51, 234, 0.4); border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
+                            <option value="default">Default</option>
+                            <option value="torrentio">Torrentio</option>
+                            <option value="minimal">Minimal</option>
+                            <option value="verbose">Verbose</option>
+                            <option value="italiano">Italiano</option>
+                            <option value="fra">Fra</option>
+                            <option value="dav">Dav</option>
+                            <option value="and">And</option>
+                            <option value="lad">Lad</option>
+                            <option value="pri">Pri</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                        <small id="formatter_status" style="margin-left: auto; color: #9ca3af;"></small>
+                    </div>
+                    <!-- Custom formatter textarea (hidden by default) -->
+                    <div id="custom_formatter_container" style="display: none; margin-top: 10px;">
+                        <div style="margin-bottom: 8px;">
+                            <label style="font-size: 11px; color: #9ca3af;">Name Template:</label>
+                            <textarea id="formatter_custom_name" rows="2"
+                                style="width: 100%; background: rgba(20, 20, 40, 0.8); border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 4px; color: white; padding: 6px; font-size: 11px; font-family: monospace; resize: vertical;"
+                                placeholder="{stream.quality} {stream.resolution}"></textarea>
+                        </div>
+                        <div>
+                            <label style="font-size: 11px; color: #9ca3af;">Description Template:</label>
+                            <textarea id="formatter_custom_desc" rows="3"
+                                style="width: 100%; background: rgba(20, 20, 40, 0.8); border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 4px; color: white; padding: 6px; font-size: 11px; font-family: monospace; resize: vertical;"
+                                placeholder="{stream.filename}\n{stream.size::bytes}"></textarea>
+                        </div>
                     </div>
                 </div>
                 <div
@@ -1129,6 +1151,11 @@
                         if (formatterStatusEl) {
                             formatterStatusEl.textContent = 'Preset: ' + (presetNames[cfg.formatter_preset] || cfg.formatter_preset);
                         }
+                        // Show custom container if preset is custom
+                        const customContainer = document.getElementById('custom_formatter_container');
+                        if (customContainer && cfg.formatter_preset === 'custom') {
+                            customContainer.style.display = 'block';
+                        }
                     }
                 }
                 if (cfg.formatter_custom_name) {
@@ -1182,75 +1209,26 @@
         aioStreamsModeCheckbox.addEventListener('change', updateInstallLink);
         introSkipEnabledCheckbox.addEventListener('change', updateInstallLink);
 
-        // Custom Formatter button handler
-        document.getElementById('formatter_button').addEventListener('click', () => {
-            const currentPreset = document.getElementById('formatter_preset').value;
-            const customName = encodeURIComponent(document.getElementById('formatter_custom_name').value || '');
-            const customDesc = encodeURIComponent(document.getElementById('formatter_custom_desc').value || '');
-            const popup = window.open(`/formatter.html?preset=${currentPreset}&name=${customName}&desc=${customDesc}`, 'formatter', 'width=1000,height=700');
-        });
+        // Formatter dropdown handler (inline - no popup needed)
+        const formatterPresetSelect = document.getElementById('formatter_preset');
+        const customFormatterContainer = document.getElementById('custom_formatter_container');
+        const formatterCustomName = document.getElementById('formatter_custom_name');
+        const formatterCustomDesc = document.getElementById('formatter_custom_desc');
 
-        // Listen for formatter config from popup (postMessage)
-        window.addEventListener('message', (event) => {
-            console.log('📨 [Formatter] Received message:', event.data);
-            if (event.data && event.data.type === 'formatter-config') {
-                applyFormatterConfig(event.data.config);
+        formatterPresetSelect.addEventListener('change', () => {
+            const preset = formatterPresetSelect.value;
+            // Show/hide custom fields
+            if (preset === 'custom') {
+                customFormatterContainer.style.display = 'block';
+            } else {
+                customFormatterContainer.style.display = 'none';
             }
-        });
-
-        // Also listen to localStorage changes (more reliable cross-origin)
-        window.addEventListener('storage', (event) => {
-            if (event.key === 'formatter_config') {
-                try {
-                    const cfg = JSON.parse(event.newValue);
-                    console.log('📨 [Formatter] Received from localStorage:', cfg);
-                    applyFormatterConfig(cfg);
-                } catch (e) {
-                    console.error('Failed to parse formatter config:', e);
-                }
-            }
-        });
-
-        // Also check localStorage when window gains focus (fallback for same-tab)
-        window.addEventListener('focus', () => {
-            const savedConfig = localStorage.getItem('formatter_config');
-            const savedTimestamp = localStorage.getItem('formatter_config_timestamp');
-            if (savedConfig && savedTimestamp) {
-                // Only apply if timestamp is recent (within last 30 seconds)
-                const age = Date.now() - parseInt(savedTimestamp);
-                if (age < 30000) {
-                    try {
-                        const cfg = JSON.parse(savedConfig);
-                        console.log('📨 [Formatter] Loaded from localStorage on focus:', cfg);
-                        applyFormatterConfig(cfg);
-                        // Clear to prevent reapplying
-                        localStorage.removeItem('formatter_config');
-                        localStorage.removeItem('formatter_config_timestamp');
-                    } catch (e) {
-                        console.error('Failed to parse formatter config:', e);
-                    }
-                }
-            }
-        });
-
-        // Helper function to apply formatter config
-        function applyFormatterConfig(cfg) {
-            document.getElementById('formatter_preset').value = cfg.preset || 'default';
-            document.getElementById('formatter_custom_name').value = cfg.customName || '';
-            document.getElementById('formatter_custom_desc').value = cfg.customDesc || '';
-            console.log('✅ [Formatter] Applied config:', cfg.preset);
-
-            // Update status display
-            const presetNames = {
-                default: 'Default', torrentio: 'Torrentio', minimal: 'Minimal',
-                verbose: 'Verbose', italiano: 'Italiano', fra: 'Fra',
-                dav: 'Dav', and: 'And', lad: 'Lad', pri: 'Pri', custom: 'Custom'
-            };
-            document.getElementById('formatter_status').textContent =
-                'Preset: ' + (presetNames[cfg.preset] || cfg.preset);
-
             updateInstallLink();
-        }
+        });
+
+        // Update link when custom templates change
+        formatterCustomName.addEventListener('input', updateInstallLink);
+        formatterCustomDesc.addEventListener('input', updateInstallLink);
 
         // Initial call to enable buttons
         updateInstallLink();
