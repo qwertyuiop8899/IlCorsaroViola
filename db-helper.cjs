@@ -254,13 +254,29 @@ async function updateRdCacheStatus(cacheResults) {
     for (const result of cacheResults) {
       if (!result.hash) continue;
 
-      const query = `
-        UPDATE torrents 
-        SET cached_rd = $1, last_cached_check = NOW()
-        WHERE info_hash = $2
-      `;
+      // ✅ NEW: Also update file_title if provided (for deduplication)
+      let query;
+      let params;
 
-      const res = await pool.query(query, [result.cached, result.hash.toLowerCase()]);
+      if (result.file_title) {
+        // Update cache status AND file_title
+        query = `
+          UPDATE torrents 
+          SET cached_rd = $1, last_cached_check = NOW(), file_title = $3
+          WHERE info_hash = $2 AND (file_title IS NULL OR file_title = '')
+        `;
+        params = [result.cached, result.hash.toLowerCase(), result.file_title];
+      } else {
+        // Only update cache status (no file_title available)
+        query = `
+          UPDATE torrents 
+          SET cached_rd = $1, last_cached_check = NOW()
+          WHERE info_hash = $2
+        `;
+        params = [result.cached, result.hash.toLowerCase()];
+      }
+
+      const res = await pool.query(query, params);
       updated += res.rowCount;
     }
 
@@ -286,8 +302,9 @@ async function getRdCachedAvailability(hashes) {
     const lowerHashes = hashes.map(h => h.toLowerCase());
 
     // Get cached results that are less than 20 days old
+    // ✅ NEW: Also fetch file_title for deduplication
     const query = `
-      SELECT info_hash, cached_rd, last_cached_check
+      SELECT info_hash, cached_rd, last_cached_check, file_title
       FROM torrents
       WHERE info_hash = ANY($1)
         AND cached_rd IS NOT NULL
@@ -302,7 +319,8 @@ async function getRdCachedAvailability(hashes) {
       cachedMap[row.info_hash] = {
         cached: row.cached_rd,
         lastCheck: row.last_cached_check,
-        fromCache: true
+        fromCache: true,
+        file_title: row.file_title || null // ✅ Include file_title
       };
     });
 
