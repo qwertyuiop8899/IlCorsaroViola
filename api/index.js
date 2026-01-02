@@ -7151,14 +7151,14 @@ async function handleStream(type, id, config, workerOrigin) {
                         title: streamTitle,
                         infoHash: result.infoHash,
                         url: streamUrl,
-                        // AIOStreams: Explicitly pass sizes at root level if needed
-                        size: isPack ? (result.file_size || result.size) : result.size,
-                        folderSize: result.size,
+                        // AIOStreams: Explicitly pass sizes at root level if needed (Ensure NUMBER)
+                        size: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0),
+                        folderSize: Number(result.sizeInBytes || 0),
                         behaviorHints: {
                             bingeGroup: 'uindex-realdebrid-optimized',
                             notWebReady: false,
                             // AIOStreams compatibility: provide file size and name for dedup
-                            ...(result.size ? { videoSize: isPack ? (result.file_size || result.size) : result.size } : {}),
+                            ...(result.size ? { videoSize: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0) } : {}),
                             ...(result.file_title || result.title ? { filename: isPack ? (result.file_title || result.title) : (result.filename || result.title) } : {})
                         },
                         _meta: {
@@ -7317,14 +7317,14 @@ async function handleStream(type, id, config, workerOrigin) {
                         title: streamTitle,
                         infoHash: result.infoHash,
                         url: streamUrl,
-                        // AIOStreams: Explicitly pass sizes at root level
-                        size: isPack ? (result.file_size || result.size) : result.size,
-                        folderSize: result.size,
+                        // AIOStreams: Explicitly pass sizes at root level (Ensure NUMBER)
+                        size: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0),
+                        folderSize: Number(result.sizeInBytes || 0),
                         behaviorHints: {
                             bingeGroup: 'uindex-torbox-optimized',
                             notWebReady: false,
                             // AIOStreams compatibility
-                            ...(result.size ? { videoSize: isPack ? (result.file_size || result.size) : result.size } : {}),
+                            ...(result.size ? { videoSize: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0) } : {}),
                             ...(result.file_title || result.title ? { filename: isPack ? (result.file_title || result.title) : (result.filename || result.title) } : {})
                         },
                         _meta: {
@@ -7468,14 +7468,14 @@ async function handleStream(type, id, config, workerOrigin) {
                         title: streamTitle,
                         infoHash: result.infoHash,
                         url: streamUrl,
-                        // AIOStreams
-                        size: isPack ? (result.file_size || result.size) : result.size,
-                        folderSize: result.size,
+                        // AIOStreams (Ensure NUMBER)
+                        size: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0),
+                        folderSize: Number(result.sizeInBytes || 0),
                         behaviorHints: {
                             bingeGroup: 'uindex-alldebrid-optimized',
                             notWebReady: false,
                             // AIOStreams compatibility
-                            ...(result.size ? { videoSize: isPack ? (result.file_size || result.size) : result.size } : {}),
+                            ...(result.size ? { videoSize: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0) } : {}),
                             ...(result.file_title || result.title ? { filename: isPack ? (result.file_title || result.title) : (result.filename || result.title) } : {})
                         },
                         _meta: {
@@ -7590,11 +7590,16 @@ async function handleStream(type, id, config, workerOrigin) {
                         name: streamName,
                         title: streamTitle,
                         infoHash: result.infoHash,
+
+                        // AIOStreams (Ensure NUMBER)
+                        size: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0),
+                        folderSize: Number(result.sizeInBytes || 0),
+
                         behaviorHints: {
                             bingeGroup: 'uindex-p2p',
                             notWebReady: true,
                             // AIOStreams compatibility
-                            ...(result.size ? { videoSize: isPack ? (result.file_size || result.size) : result.size } : {}),
+                            ...(result.size ? { videoSize: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0) } : {}),
                             ...(result.file_title || result.title ? { filename: isPack ? (result.file_title || result.title) : (result.filename || result.title) } : {})
                         },
                         _meta: { infoHash: result.infoHash, cached: false, quality: result.quality, seeders: result.seeders }
