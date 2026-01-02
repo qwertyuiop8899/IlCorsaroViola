@@ -732,6 +732,68 @@
                 </div>
                 <div
                     style="margin-bottom: 15px; padding: 12px 15px; background: rgba(10, 10, 26, 0.4); border-radius: 8px; border: 1px solid rgba(147, 51, 234, 0.2);">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span>🎨 Formatter</span>
+                        <select id="formatter_preset"
+                            style="padding: 6px 12px; background: rgba(30, 30, 50, 0.8); border: 1px solid rgba(147, 51, 234, 0.4); border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
+                            <option value="default">Default</option>
+                            <option value="torrentio">Torrentio</option>
+                            <option value="minimal">Minimal</option>
+                            <option value="verbose">Verbose</option>
+                            <option value="italiano">Italiano</option>
+                            <option value="fra">Fra</option>
+                            <option value="dav">Dav</option>
+                            <option value="and">And</option>
+                            <option value="lad">Lad</option>
+                            <option value="pri">Pri</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                        <a href="/formatter.html" target="_blank" id="formatter_preview_link"
+                            style="font-size: 11px; color: #a78bfa; text-decoration: underline; cursor: pointer;">📋
+                            Anteprima & Variabili</a>
+                        <small id="formatter_status" style="margin-left: auto; color: #9ca3af;"></small>
+                    </div>
+                    <!-- Custom formatter textarea (hidden by default) -->
+                    <div id="custom_formatter_container" style="display: none; margin-top: 10px;">
+                        <div style="margin-bottom: 8px;">
+                            <label style="font-size: 11px; color: #9ca3af;">Name Template:</label>
+                            <textarea id="formatter_custom_name" rows="2"
+                                style="width: 100%; background: rgba(20, 20, 40, 0.8); border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 4px; color: white; padding: 6px; font-size: 11px; font-family: monospace; resize: vertical;"
+                                placeholder="Es: {stream.resolution} {stream.quality}"></textarea>
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <label style="font-size: 11px; color: #9ca3af;">Description Template:</label>
+                            <textarea id="formatter_custom_desc" rows="3"
+                                style="width: 100%; background: rgba(20, 20, 40, 0.8); border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 4px; color: white; padding: 6px; font-size: 11px; font-family: monospace; resize: vertical;"
+                                placeholder="Es: {stream.filename}\n{stream.size::bytes}"></textarea>
+                        </div>
+                        <details style="font-size: 10px; color: #9ca3af;">
+                            <summary style="cursor: pointer; color: #a78bfa;">📖 Variabili disponibili</summary>
+                            <div
+                                style="margin-top: 6px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; font-family: monospace;">
+                                <strong>Stream:</strong> {stream.quality}, {stream.resolution}, {stream.filename},
+                                {stream.size::bytes}, {stream.seeders}, {stream.codec}, {stream.encode},
+                                {stream.languageEmojis::join(' ')}, {stream.audioTags::join(' ')},
+                                {stream.visualTags::join(' ')}, {stream.releaseGroup}<br>
+                                <strong>Service:</strong> {service.name}, {service.shortName},
+                                {service.cached::istrue["⚡"||"❌"]}<br>
+                                <strong>Addon:</strong> {addon.name}<br>
+                                <strong>Syntax:</strong> {field::exists["show"||"hide"]}, {field::&gt;0["yes"||"no"]},
+                                {field::~pattern["match"||"no"]}, {text::small}
+                            </div>
+                        </details>
+                        <div style="margin-top: 10px; display: flex; gap: 10px;">
+                            <button type="button" id="formatter_save_btn"
+                                style="padding: 8px 16px; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 6px; color: white; font-size: 12px; cursor: pointer; font-weight: bold;">
+                                💾 SALVA Template
+                            </button>
+                            <span id="formatter_save_status"
+                                style="color: #10b981; font-size: 11px; align-self: center;"></span>
+                        </div>
+                    </div>
+                </div>
+                <div
+                    style="margin-bottom: 15px; padding: 12px 15px; background: rgba(10, 10, 26, 0.4); border-radius: 8px; border: 1px solid rgba(147, 51, 234, 0.2);">
                     <label style="display: flex; align-items: center; gap: 10px;">
                         <input type="checkbox" id="introskip_enabled">
                         <span>⏩ IntroSkip (Salta Intro Serie TV)</span>
@@ -892,6 +954,20 @@
                 config.introskip_enabled = true;
             }
 
+            // Custom Formatter
+            const formatterPreset = document.getElementById('formatter_preset').value;
+            if (formatterPreset && formatterPreset !== 'default') {
+                config.formatter_preset = formatterPreset;
+                if (formatterPreset === 'custom') {
+                    const customName = document.getElementById('formatter_custom_name').value;
+                    const customDesc = document.getElementById('formatter_custom_desc').value;
+                    console.log('🎨 [Formatter Save] name:', customName ? customName.substring(0, 30) + '...' : '(empty)');
+                    console.log('🎨 [Formatter Save] desc:', customDesc ? customDesc.substring(0, 30) + '...' : '(empty)');
+                    if (customName) config.formatter_custom_name = customName;
+                    if (customDesc) config.formatter_custom_desc = customDesc;
+                }
+            }
+
             // Check if at least one search site is selected
             let searchSites = [];
             if (config.use_corsaronero) searchSites.push("CorsaroNero");
@@ -914,7 +990,12 @@
             }
 
             // Generate install URL
-            const encodedConfig = btoa(JSON.stringify(config));
+            // Fix for Unicode/Emoji in btoa: https://developer.mozilla.org/en-US/docs/Glossary/Base64#the_unicode_problem
+            const jsonConfig = JSON.stringify(config);
+            const encodedConfig = btoa(encodeURIComponent(jsonConfig).replace(/%([0-9A-F]{2})/g,
+                function toSolidBytes(match, p1) {
+                    return String.fromCharCode('0x' + p1);
+                }));
             const installUrl = `stremio://${window.location.host}/${encodedConfig}/manifest.json`;
 
             installLinkDisplay.value = installUrl;
@@ -1076,6 +1157,8 @@
                     if (el) {
                         el.checked = true;
                         console.log('✅ Loaded aiostreams_mode');
+                        // ✅ Disable formatter UI when AIOStreams is loaded as active
+                        setTimeout(() => { if (typeof updateFormatterState === 'function') updateFormatterState(); }, 100);
                     }
                 }
                 if (cfg.introskip_enabled) {
@@ -1083,6 +1166,45 @@
                     if (el) {
                         el.checked = true;
                         console.log('✅ Loaded introskip_enabled');
+                    }
+                }
+
+                // Custom Formatter settings
+                if (cfg.formatter_preset) {
+                    const formatterPresetEl = document.getElementById('formatter_preset');
+                    const formatterStatusEl = document.getElementById('formatter_status');
+                    if (formatterPresetEl) {
+                        formatterPresetEl.value = cfg.formatter_preset;
+                        console.log('✅ Loaded formatter_preset:', cfg.formatter_preset);
+
+                        // Update status display
+                        const presetNames = {
+                            default: 'Default', torrentio: 'Torrentio', minimal: 'Minimal',
+                            verbose: 'Verbose', italiano: 'Italiano', fra: 'Fra',
+                            dav: 'Dav', and: 'And', lad: 'Lad', pri: 'Pri', custom: 'Custom'
+                        };
+                        if (formatterStatusEl) {
+                            formatterStatusEl.textContent = 'Preset: ' + (presetNames[cfg.formatter_preset] || cfg.formatter_preset);
+                        }
+                        // Show custom container if preset is custom
+                        const customContainer = document.getElementById('custom_formatter_container');
+                        if (customContainer && cfg.formatter_preset === 'custom') {
+                            customContainer.style.display = 'block';
+                        }
+                    }
+                }
+                if (cfg.formatter_custom_name) {
+                    const el = document.getElementById('formatter_custom_name');
+                    if (el) {
+                        el.value = cfg.formatter_custom_name;
+                        console.log('✅ Loaded formatter_custom_name');
+                    }
+                }
+                if (cfg.formatter_custom_desc) {
+                    const el = document.getElementById('formatter_custom_desc');
+                    if (el) {
+                        el.value = cfg.formatter_custom_desc;
+                        console.log('✅ Loaded formatter_custom_desc');
                     }
                 }
 
@@ -1121,6 +1243,82 @@
         // Event listeners for feature toggles
         aioStreamsModeCheckbox.addEventListener('change', updateInstallLink);
         introSkipEnabledCheckbox.addEventListener('change', updateInstallLink);
+
+        // Formatter dropdown handler (inline - no popup needed)
+        const formatterPresetSelect = document.getElementById('formatter_preset');
+        const customFormatterContainer = document.getElementById('custom_formatter_container');
+        const formatterCustomName = document.getElementById('formatter_custom_name');
+        const formatterCustomDesc = document.getElementById('formatter_custom_desc');
+        const formatterPreviewLink = document.getElementById('formatter_preview_link');
+        const formatterStatus = document.getElementById('formatter_status');
+
+        // ✅ Helper: Toggle formatter based on AIOStreams mode
+        function updateFormatterState() {
+            const aioActive = aioStreamsModeCheckbox.checked;
+            formatterPresetSelect.disabled = aioActive;
+            formatterPresetSelect.style.opacity = aioActive ? '0.5' : '1';
+            formatterPresetSelect.style.cursor = aioActive ? 'not-allowed' : 'pointer';
+            formatterPreviewLink.style.opacity = aioActive ? '0.5' : '1';
+            formatterPreviewLink.style.pointerEvents = aioActive ? 'none' : 'auto';
+
+            if (aioActive) {
+                formatterStatus.textContent = '⚠️ Disabilitato in modalità AIOStreams';
+                formatterStatus.style.color = '#f59e0b';
+                customFormatterContainer.style.display = 'none';
+            } else {
+                formatterStatus.textContent = '';
+            }
+            updateInstallLink();
+        }
+
+        // AIOStreams mode toggle
+        aioStreamsModeCheckbox.addEventListener('change', updateFormatterState);
+
+        formatterPresetSelect.addEventListener('change', () => {
+            const preset = formatterPresetSelect.value;
+            // Show/hide custom fields
+            if (preset === 'custom') {
+                customFormatterContainer.style.display = 'block';
+            } else {
+                customFormatterContainer.style.display = 'none';
+            }
+            updateInstallLink();
+        });
+
+        // Update link when custom templates change
+        formatterCustomName.addEventListener('input', updateInstallLink);
+        formatterCustomDesc.addEventListener('input', updateInstallLink);
+
+        // Preview link opens popup with current templates
+        formatterPreviewLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            const currentPreset = formatterPresetSelect.value;
+            const customName = encodeURIComponent(formatterCustomName.value || '');
+            const customDesc = encodeURIComponent(formatterCustomDesc.value || '');
+            window.open(`/formatter.html?preset=${currentPreset}&name=${customName}&desc=${customDesc}`, 'formatter', 'width=1100,height=750');
+        });
+
+        // Save button explicitly updates install link with current formatter values
+        const formatterSaveBtn = document.getElementById('formatter_save_btn');
+        const formatterSaveStatus = document.getElementById('formatter_save_status');
+
+        formatterSaveBtn.addEventListener('click', () => {
+            // Force read the values from textareas
+            const nameVal = formatterCustomName.value;
+            const descVal = formatterCustomDesc.value;
+
+            console.log('💾 [SAVE] Name template:', nameVal);
+            console.log('💾 [SAVE] Desc template:', descVal);
+
+            // Trigger updateInstallLink to regenerate the URL
+            updateInstallLink();
+
+            // Show confirmation
+            formatterSaveStatus.textContent = '✅ Template salvato!';
+            setTimeout(() => {
+                formatterSaveStatus.textContent = '';
+            }, 3000);
+        });
 
         // Initial call to enable buttons
         updateInstallLink();

@@ -147,6 +147,8 @@ async function fetchFilesFromRealDebrid(infoHash, rdKey) {
 
 /**
  * Ottiene la lista file da Torbox
+ * OPTIMIZED: Uses checkcached with list_files=true first (1 API call)
+ * Falls back to add/check/delete only if not cached
  * @param {string} infoHash - Hash del torrent
  * @param {string} torboxKey - API key Torbox
  * @returns {Promise<{torrentId: string, files: Array}|null>}
@@ -156,10 +158,47 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
     const headers = { 'Authorization': `Bearer ${torboxKey}` };
 
     try {
+        // ✅ STEP 1: Try checkcached with list_files=true (FAST PATH - 1 API call)
+        console.log(`📦 [PACK-HANDLER] Checking Torbox cache for file list: ${infoHash.substring(0, 8)}...`);
+
+        try {
+            const cacheResponse = await axios.get(
+                `${baseUrl}/torrents/checkcached`,
+                {
+                    headers,
+                    params: {
+                        hash: infoHash.toUpperCase(),
+                        format: 'object',
+                        list_files: true
+                    },
+                    timeout: 10000
+                }
+            );
+
+            // Check if we got files from cache
+            const cacheData = cacheResponse.data?.data;
+            if (cacheData && typeof cacheData === 'object') {
+                const hashKey = Object.keys(cacheData).find(k => k.toLowerCase() === infoHash.toLowerCase());
+                if (hashKey && cacheData[hashKey]?.files && cacheData[hashKey].files.length > 0) {
+                    const files = cacheData[hashKey].files.map((f, idx) => ({
+                        id: idx,
+                        path: f.name || f.path || `file_${idx}`,
+                        bytes: f.size || 0,
+                        selected: 1
+                    }));
+                    console.log(`✅ [PACK-HANDLER] Got ${files.length} files from Torbox CACHE (fast path)`);
+                    return { torrentId: 'cached', files };
+                }
+            }
+            console.log(`⚠️ [PACK-HANDLER] Not in cache or no files, trying slow path...`);
+        } catch (cacheError) {
+            console.log(`⚠️ [PACK-HANDLER] Cache check failed: ${cacheError.message}, trying slow path...`);
+        }
+
+        // ✅ STEP 2: Fallback - Add torrent to get file list (SLOW PATH - 3 API calls)
         console.log(`📦 [PACK-HANDLER] Adding magnet to Torbox for file list: ${infoHash.substring(0, 8)}...`);
         const magnetLink = `magnet:?xt=urn:btih:${infoHash}`;
 
-        // 1. Crea torrent
         const addResponse = await axios.post(
             `${baseUrl}/torrents/createtorrent`,
             { magnet: magnetLink },
@@ -171,11 +210,8 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
         }
 
         const torrentId = addResponse.data.data.torrent_id;
-
-        // 2. Aspetta un po' per permettere a Torbox di processare
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // 3. Ottieni info torrent
         const infoResponse = await axios.get(
             `${baseUrl}/torrents/mylist`,
             { headers, params: { id: torrentId }, timeout: 30000 }
@@ -183,7 +219,6 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
 
         const torrent = infoResponse.data?.data?.find(t => t.id === torrentId);
         if (!torrent || !torrent.files) {
-            // Cancella torrent
             await axios.get(`${baseUrl}/torrents/controltorrent`, {
                 headers,
                 params: { torrent_id: torrentId, operation: 'delete' }
@@ -198,7 +233,6 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
             selected: 1
         }));
 
-        // 4. Cancella torrent
         console.log(`🗑️ [PACK-HANDLER] Deleting temporary Torbox torrent ${torrentId}`);
         await axios.get(`${baseUrl}/torrents/controltorrent`, {
             headers,
@@ -207,13 +241,12 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
             console.warn(`⚠️ [PACK-HANDLER] Failed to delete Torbox torrent: ${err.message}`);
         });
 
-        console.log(`✅ [PACK-HANDLER] Got ${files.length} files from Torbox`);
+        console.log(`✅ [PACK-HANDLER] Got ${files.length} files from Torbox (slow path)`);
         return { torrentId, files };
 
     } catch (error) {
         console.error(`❌ [PACK-HANDLER] Torbox API error: ${error.message}`);
-        // return null; // OLD
-        throw error; // NEW: Rethrow
+        throw error;
     }
 }
 
