@@ -7082,35 +7082,53 @@ async function handleStream(type, id, config, workerOrigin) {
                     let titleLine1 = '';
                     let titleLine2 = '';
 
-                    // ✅ FIX: A pack is ONLY when the title indicates a season pack, NOT just having fileIndex
-                    // fileIndex is now also set for single episodes after verification
-                    const isPack = packFilesHandler.isSeasonPack(result.title);
+                    // ✅ MOVIE/SERIES TITLE DISPLAY
+                    if (type === 'movie') {
+                        // For movies: detect if it's a collection pack
+                        // A collection pack has fileIndex AND file_title differs from title
+                        const isMovieCollection = result.fileIndex !== undefined &&
+                            result.file_title &&
+                            result.file_title !== result.title;
 
-                    if (isPack) {
-                        // ✅ AIO Mode: Prioritize File Name for visibility
-                        if (config.aiostreams_mode && result.file_title) {
-                            titleLine1 = `📂 ${result.file_title}`;
-                            titleLine2 = `🗳️ ${result.title}`;
-                        } else {
-                            // Standard Mode
-                            titleLine1 = `🗳️ ${result.title}`;
-                            // If we have a specific file title (from DB or constructed), show it
-                            if (result.file_title) {
-                                titleLine2 = `📂 ${result.file_title}`;
-                            } else if (type === 'series' && season && episode && mediaDetails) {
-                                const seasonStr = String(season).padStart(2, '0');
-                                const episodeStr = String(episode).padStart(2, '0');
-                                titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                        if (isMovieCollection) {
+                            // Movie collection: show BOTH pack and file (like series)
+                            if (config.aiostreams_mode) {
+                                titleLine1 = `📂 ${result.file_title}`;
+                                titleLine2 = `🗳️ ${result.title}`;
                             } else {
-                                titleLine2 = `📂 ${result.filename || result.title}`;
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${result.file_title}`;
                             }
+                        } else {
+                            // Single movie: only show file_title (or fallback to title)
+                            titleLine1 = `🎬 ${result.file_title || result.title}`;
                         }
                     } else {
-                        // ✅ AIO Mode: Use file_title if available (even for non-packs)
-                        if (config.aiostreams_mode && result.file_title) {
-                            titleLine1 = `🎬 ${result.file_title}`;
+                        // SERIES logic (unchanged)
+                        const isPack = packFilesHandler.isSeasonPack(result.title);
+
+                        if (isPack) {
+                            if (config.aiostreams_mode && result.file_title) {
+                                titleLine1 = `📂 ${result.file_title}`;
+                                titleLine2 = `🗳️ ${result.title}`;
+                            } else {
+                                titleLine1 = `🗳️ ${result.title}`;
+                                if (result.file_title) {
+                                    titleLine2 = `📂 ${result.file_title}`;
+                                } else if (season && episode && mediaDetails) {
+                                    const seasonStr = String(season).padStart(2, '0');
+                                    const episodeStr = String(episode).padStart(2, '0');
+                                    titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                                } else {
+                                    titleLine2 = `📂 ${result.filename || result.title}`;
+                                }
+                            }
                         } else {
-                            titleLine1 = `🎬 ${result.title}`;
+                            if (config.aiostreams_mode && result.file_title) {
+                                titleLine1 = `🎬 ${result.file_title}`;
+                            } else {
+                                titleLine1 = `🎬 ${result.title}`;
+                            }
                         }
                     }
 
@@ -7287,31 +7305,49 @@ async function handleStream(type, id, config, workerOrigin) {
                     let titleLine1 = '';
                     let titleLine2 = '';
 
-                    const isPack = packFilesHandler.isSeasonPack(result.title);
+                    // ✅ MOVIE/SERIES TITLE DISPLAY
+                    if (type === 'movie') {
+                        const isMovieCollection = result.fileIndex !== undefined &&
+                            result.file_title &&
+                            result.file_title !== result.title;
 
-                    if (isPack) {
-                        // ✅ AIO Mode: Prioritize File Name for visibility
-                        if (config.aiostreams_mode && result.file_title) {
-                            titleLine1 = `📂 ${result.file_title}`;
-                            titleLine2 = `🗳️ ${result.title}`;
-                        } else {
-                            titleLine1 = `🗳️ ${result.title}`;
-                            if (result.file_title) {
-                                titleLine2 = `📂 ${result.file_title}`;
-                            } else if (type === 'series' && season && episode && mediaDetails) {
-                                const seasonStr = String(season).padStart(2, '0');
-                                const episodeStr = String(episode).padStart(2, '0');
-                                titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                        if (isMovieCollection) {
+                            if (config.aiostreams_mode) {
+                                titleLine1 = `📂 ${result.file_title}`;
+                                titleLine2 = `🗳️ ${result.title}`;
                             } else {
-                                titleLine2 = `📂 ${result.filename || result.title}`;
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${result.file_title}`;
                             }
+                        } else {
+                            titleLine1 = `🎬 ${result.file_title || result.title}`;
                         }
                     } else {
-                        // ✅ AIO Mode: Use file_title if available (even for non-packs)
-                        if (config.aiostreams_mode && result.file_title) {
-                            titleLine1 = `🎬 ${result.file_title}`;
+                        // SERIES logic
+                        const isPack = packFilesHandler.isSeasonPack(result.title);
+
+                        if (isPack) {
+                            if (config.aiostreams_mode && result.file_title) {
+                                titleLine1 = `📂 ${result.file_title}`;
+                                titleLine2 = `🗳️ ${result.title}`;
+                            } else {
+                                titleLine1 = `🗳️ ${result.title}`;
+                                if (result.file_title) {
+                                    titleLine2 = `📂 ${result.file_title}`;
+                                } else if (season && episode && mediaDetails) {
+                                    const seasonStr = String(season).padStart(2, '0');
+                                    const episodeStr = String(episode).padStart(2, '0');
+                                    titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                                } else {
+                                    titleLine2 = `📂 ${result.filename || result.title}`;
+                                }
+                            }
                         } else {
-                            titleLine1 = `🎬 ${result.title}`;
+                            if (config.aiostreams_mode && result.file_title) {
+                                titleLine1 = `🎬 ${result.file_title}`;
+                            } else {
+                                titleLine1 = `🎬 ${result.title}`;
+                            }
                         }
                     }
 
@@ -7443,31 +7479,49 @@ async function handleStream(type, id, config, workerOrigin) {
                     let titleLine1 = '';
                     let titleLine2 = '';
 
-                    const isPack = packFilesHandler.isSeasonPack(result.title);
+                    // ✅ MOVIE/SERIES TITLE DISPLAY
+                    if (type === 'movie') {
+                        const isMovieCollection = result.fileIndex !== undefined &&
+                            result.file_title &&
+                            result.file_title !== result.title;
 
-                    if (isPack) {
-                        // ✅ AIO Mode: Prioritize File Name for visibility
-                        if (config.aiostreams_mode && result.file_title) {
-                            titleLine1 = `📂 ${result.file_title}`;
-                            titleLine2 = `🗳️ ${result.title}`;
-                        } else {
-                            titleLine1 = `🗳️ ${result.title}`;
-                            if (result.file_title) {
-                                titleLine2 = `📂 ${result.file_title}`;
-                            } else if (type === 'series' && season && episode && mediaDetails) {
-                                const seasonStr = String(season).padStart(2, '0');
-                                const episodeStr = String(episode).padStart(2, '0');
-                                titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                        if (isMovieCollection) {
+                            if (config.aiostreams_mode) {
+                                titleLine1 = `📂 ${result.file_title}`;
+                                titleLine2 = `🗳️ ${result.title}`;
                             } else {
-                                titleLine2 = `📂 ${result.filename || result.title}`;
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${result.file_title}`;
                             }
+                        } else {
+                            titleLine1 = `🎬 ${result.file_title || result.title}`;
                         }
                     } else {
-                        // ✅ AIO Mode: Use file_title if available (even for non-packs)
-                        if (config.aiostreams_mode && result.file_title) {
-                            titleLine1 = `🎬 ${result.file_title}`;
+                        // SERIES logic
+                        const isPack = packFilesHandler.isSeasonPack(result.title);
+
+                        if (isPack) {
+                            if (config.aiostreams_mode && result.file_title) {
+                                titleLine1 = `📂 ${result.file_title}`;
+                                titleLine2 = `🗳️ ${result.title}`;
+                            } else {
+                                titleLine1 = `🗳️ ${result.title}`;
+                                if (result.file_title) {
+                                    titleLine2 = `📂 ${result.file_title}`;
+                                } else if (season && episode && mediaDetails) {
+                                    const seasonStr = String(season).padStart(2, '0');
+                                    const episodeStr = String(episode).padStart(2, '0');
+                                    titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                                } else {
+                                    titleLine2 = `📂 ${result.filename || result.title}`;
+                                }
+                            }
                         } else {
-                            titleLine1 = `🎬 ${result.title}`;
+                            if (config.aiostreams_mode && result.file_title) {
+                                titleLine1 = `🎬 ${result.file_title}`;
+                            } else {
+                                titleLine1 = `🎬 ${result.title}`;
+                            }
                         }
                     }
 
@@ -7576,21 +7630,37 @@ async function handleStream(type, id, config, workerOrigin) {
                     let titleLine1 = '';
                     let titleLine2 = '';
 
-                    const isPack = packFilesHandler.isSeasonPack(result.title);
+                    // ✅ MOVIE/SERIES TITLE DISPLAY
+                    if (type === 'movie') {
+                        const isMovieCollection = result.fileIndex !== undefined &&
+                            result.file_title &&
+                            result.file_title !== result.title;
 
-                    if (isPack) {
-                        titleLine1 = `🗳️ ${result.title}`;
-                        if (result.file_title) {
+                        if (isMovieCollection) {
+                            // Movie collection: show BOTH pack and file
+                            titleLine1 = `🗳️ ${result.title}`;
                             titleLine2 = `📂 ${result.file_title}`;
-                        } else if (type === 'series' && season && episode && mediaDetails) {
-                            const seasonStr = String(season).padStart(2, '0');
-                            const episodeStr = String(episode).padStart(2, '0');
-                            titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
                         } else {
-                            titleLine2 = `📂 ${result.filename || result.title}`;
+                            titleLine1 = `🎬 ${result.file_title || result.title}`;
                         }
                     } else {
-                        titleLine1 = `🎬 ${result.title}`;
+                        // SERIES logic
+                        const isPack = packFilesHandler.isSeasonPack(result.title);
+
+                        if (isPack) {
+                            titleLine1 = `🗳️ ${result.title}`;
+                            if (result.file_title) {
+                                titleLine2 = `📂 ${result.file_title}`;
+                            } else if (season && episode && mediaDetails) {
+                                const seasonStr = String(season).padStart(2, '0');
+                                const episodeStr = String(episode).padStart(2, '0');
+                                titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                            } else {
+                                titleLine2 = `📂 ${result.filename || result.title}`;
+                            }
+                        } else {
+                            titleLine1 = `🎬 ${result.title}`;
+                        }
                     }
 
                     // Size display with pack/episode format
