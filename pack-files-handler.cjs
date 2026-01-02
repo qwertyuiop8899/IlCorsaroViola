@@ -207,6 +207,9 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
             console.warn(`⚠️ [PACK-HANDLER] Failed to delete Torbox torrent: ${err.message}`);
         });
 
+        // 5. Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+
         console.log(`✅ [PACK-HANDLER] Got ${files.length} files from Torbox`);
         return { torrentId, files };
 
