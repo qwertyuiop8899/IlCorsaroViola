@@ -254,13 +254,29 @@ async function updateRdCacheStatus(cacheResults) {
     for (const result of cacheResults) {
       if (!result.hash) continue;
 
-      const query = `
-        UPDATE torrents 
-        SET cached_rd = $1, last_cached_check = NOW()
-        WHERE info_hash = $2
-      `;
+      // ✅ NEW: Also update file_title if provided (for deduplication)
+      let query;
+      let params;
 
-      const res = await pool.query(query, [result.cached, result.hash.toLowerCase()]);
+      if (result.file_title) {
+        // Update cache status AND file_title
+        query = `
+          UPDATE torrents 
+          SET cached_rd = $1, last_cached_check = NOW(), file_title = $3
+          WHERE info_hash = $2 AND (file_title IS NULL OR file_title = '')
+        `;
+        params = [result.cached, result.hash.toLowerCase(), result.file_title];
+      } else {
+        // Only update cache status (no file_title available)
+        query = `
+          UPDATE torrents 
+          SET cached_rd = $1, last_cached_check = NOW()
+          WHERE info_hash = $2
+        `;
+        params = [result.cached, result.hash.toLowerCase()];
+      }
+
+      const res = await pool.query(query, params);
       updated += res.rowCount;
     }
 
@@ -286,13 +302,14 @@ async function getRdCachedAvailability(hashes) {
     const lowerHashes = hashes.map(h => h.toLowerCase());
 
     // Get cached results that are less than 20 days old
+    // ✅ NEW: Also fetch file_title for deduplication
     const query = `
-      SELECT info_hash, cached_rd, last_cached_check
+      SELECT info_hash, cached_rd, last_cached_check, file_title, size
       FROM torrents
       WHERE info_hash = ANY($1)
         AND cached_rd IS NOT NULL
         AND last_cached_check IS NOT NULL
-        AND last_cached_check > NOW() - INTERVAL '20 days'
+        AND last_cached_check > NOW() - INTERVAL '10 days'
     `;
 
     const result = await pool.query(query, [lowerHashes]);
@@ -302,17 +319,47 @@ async function getRdCachedAvailability(hashes) {
       cachedMap[row.info_hash] = {
         cached: row.cached_rd,
         lastCheck: row.last_cached_check,
-        fromCache: true
+        fromCache: true,
+        file_title: row.file_title || null, // ✅ Include file_title
+        size: row.size ? parseInt(row.size) : null
       };
     });
 
-    console.log(`💾 [DB] Found ${result.rows.length}/${hashes.length} hashes with valid RD cache (< 20 days)`);
+    console.log(`💾 [DB] Found ${result.rows.length}/${hashes.length} hashes with valid RD cache (< 10 days)`);
 
     return cachedMap;
 
   } catch (error) {
     console.error(`❌ [DB] Error getting RD cached availability:`, error.message);
     return {};
+  }
+}
+
+/**
+ * Refresh RD cache timestamp when user plays a cached file
+ * This extends the cache validity to 10 more days
+ * @param {string} infoHash - The torrent hash to refresh
+ * @returns {Promise<boolean>} Success status
+ */
+async function refreshRdCacheTimestamp(infoHash) {
+  if (!pool) return false;
+  if (!infoHash) return false;
+
+  try {
+    const query = `
+      UPDATE torrents 
+      SET last_cached_check = NOW()
+      WHERE info_hash = $1 AND cached_rd = true
+    `;
+    const result = await pool.query(query, [infoHash.toLowerCase()]);
+
+    if (result.rowCount > 0) {
+      console.log(`🔄 [DB] Refreshed RD cache timestamp for ${infoHash.substring(0, 8)}... (+10 days)`);
+    }
+    return result.rowCount > 0;
+  } catch (error) {
+    console.error(`❌ [DB] Error refreshing RD cache timestamp:`, error.message);
+    return false;
   }
 }
 
@@ -899,6 +946,7 @@ module.exports = {
   insertTorrent,
   updateRdCacheStatus,
   getRdCachedAvailability,
+  refreshRdCacheTimestamp,
   batchInsertTorrents,
   updateTorrentFileInfo,
   deleteFileInfo,

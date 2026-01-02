@@ -17,6 +17,7 @@ const { searchRARBG } = require('../rarbg.cjs');
 const aioFormatter = require('../aiostreams-formatter.cjs');
 const packFilesHandler = require('../pack-files-handler.cjs');
 const introSkip = require('../introskip.cjs');
+const customFormatter = require('../formatter.cjs');
 
 // ✅ External Addon Integration (Torrentio, MediaFusion, Comet)
 import { fetchExternalAddonsFlat, EXTERNAL_ADDONS } from './external-addons.js';
@@ -53,6 +54,395 @@ function decodeHtmlEntities(text) {
 
 // ✅ DEBUG MODE
 const DEBUG_MODE = false;
+
+// ✅ Custom Formatter Helper - Full AIOStreams compatible
+// ✅ Custom Formatter Helper - Full AIOStreams compatible
+function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', isCached = false) {
+    // If AIOStreams mode is enabled, SKIP custom formatting to preserve AIO format
+    if (userConfig && userConfig.aiostreams_mode) return stream;
+
+    if (!userConfig || !userConfig.formatter_preset) return stream;
+
+    try {
+        const preset = userConfig.formatter_preset;
+        let templates;
+
+        if (preset === 'custom') {
+            templates = {
+                name: userConfig.formatter_custom_name || '',
+                description: userConfig.formatter_custom_desc || ''
+            };
+            console.log(`🎨 [Formatter] Custom preset detected - name template: "${templates.name?.substring(0, 50)}...", desc template: "${templates.description?.substring(0, 50)}..."`);
+        } else {
+            templates = customFormatter.PRESET_TEMPLATES[preset];
+            console.log(`🎨 [Formatter] Using preset: ${preset}`);
+        }
+
+        if (!templates) return stream;
+
+        const filename = result.filename || result.title || '';
+        const fn = filename.toLowerCase();
+
+        // ============================================
+        // PATTERN EXTRACTION HELPERS
+        // ============================================
+        const extractPattern = (str, patterns) => {
+            for (const [key, regex] of Object.entries(patterns)) {
+                if (regex.test(str)) return key;
+            }
+            return '';
+        };
+
+        const extractMultiple = (str, patterns) => {
+            const matches = [];
+            for (const [key, regex] of Object.entries(patterns)) {
+                if (regex.test(str)) matches.push(key);
+            }
+            return matches;
+        };
+
+        // ============================================
+        // ALL PATTERNS (AIOStreams-compatible)
+        // ============================================
+        const visualPatterns = {
+            'HDR10+': /hdr.?10.?\+|hdr.?10.?plus/i,
+            'HDR10': /hdr.?10(?!.?\+)/i,
+            'HDR': /\bhdr\b(?!.?10)/i,
+            'DV': /dolby.?vision|dovi|\bdv\b/i,
+            '10bit': /10.?bit/i,
+            'IMAX': /\bimax\b/i,
+            '3D': /\b3d\b/i,
+            'SDR': /\bsdr\b/i
+        };
+
+        const audioPatterns = {
+            'Atmos': /\batmos\b/i,
+            'TrueHD': /true.?hd/i,
+            'DTS-HD MA': /dts.?hd.?ma/i,
+            'DTS-HD': /dts.?hd(?!.?ma)/i,
+            'DTS-ES': /dts.?es/i,
+            'DTS': /\bdts\b(?!.?hd|.?es)/i,
+            'DD+': /dd\+|ddp|e.?ac.?3/i,
+            'DD': /\bdd\b|dolby.?digital(?!.?\+)|(?<!e.?)ac.?3/i,
+            'FLAC': /\bflac\b/i,
+            'OPUS': /\bopus\b/i,
+            'AAC': /\baac\b/i
+        };
+
+        const audioChannelPatterns = {
+            '7.1': /7\.?1/i,
+            '5.1': /5\.?1/i,
+            '2.0': /2\.?0|stereo/i
+        };
+
+        const codecPatterns = {
+            'HEVC': /hevc|x.?265|h.?265/i,
+            'AVC': /avc|x.?264|h.?264/i,
+            'AV1': /\bav1\b/i,
+            'XviD': /xvid/i,
+            'DivX': /divx/i
+        };
+
+        const resolutionPatterns = {
+            '2160p': /2160p|4k|uhd/i,
+            '1440p': /1440p|2k|qhd/i,
+            '1080p': /1080p/i,
+            '720p': /720p/i,
+            '576p': /576p/i,
+            '480p': /480p/i,
+            '360p': /360p/i
+        };
+
+        const qualityPatterns = {
+            'Remux': /\bremux\b/i,
+            'BluRay': /blu.?ray|bdrip|brrip/i,
+            'WEB-DL': /web.?dl/i,
+            'WEBRip': /web.?rip/i,
+            'HDRip': /hd.?rip/i,
+            'DVDRip': /dvd.?rip/i,
+            'HDTV': /hdtv/i,
+            'PDTV': /pdtv/i,
+            'CAM': /\bcam\b|camrip/i,
+            'TS': /\bts\b|telesync/i,
+            'TC': /\btc\b|telecine/i,
+            'SCR': /\bscr\b|screener/i
+        };
+
+        const editionPatterns = {
+            'Extended': /extended|ext.?cut/i,
+            'Theatrical': /theatrical/i,
+            'Director': /director.?s?.?cut|dc\b/i,
+            'Ultimate': /ultimate/i,
+            'Anniversary': /anniversary/i,
+            'IMAX': /imax.?(edition)?/i,
+            'Remastered': /remaster(ed)?/i,
+            'Collectors': /collector.?s?/i,
+            'Uncut': /uncut/i,
+            'Diamond': /diamond/i
+        };
+
+        const networkPatterns = {
+            'Netflix': /\bnetflix\b|nf\b/i,
+            'Amazon': /\bamazon\b|amzn\b/i,
+            'HBO': /\bhbo\b|hmax\b/i,
+            'Disney+': /\bdisney\b|dsnp\b|d\+/i,
+            'Apple TV+': /\batv\b|atvp\b/i,
+            'Hulu': /\bhulu\b/i,
+            'Paramount+': /\bpmtp\b|paramount\+?/i
+        };
+
+        // Extract all fields from filename (normalizeResolution is defined below after language handling)
+        const rawResolution = result.resolution || extractPattern(filename, resolutionPatterns) || '';
+        const quality = result.quality || extractPattern(filename, qualityPatterns) || '';
+        const encode = result.codec || result.videoCodec || extractPattern(filename, codecPatterns) || '';
+        const visualTags = result.visualTags?.length ? result.visualTags : extractMultiple(filename, visualPatterns);
+        const audioTags = result.audioTags?.length ? result.audioTags : extractMultiple(filename, audioPatterns);
+        const audioChannels = extractMultiple(filename, audioChannelPatterns);
+        const edition = extractPattern(filename, editionPatterns) || null;
+        const network = extractPattern(filename, networkPatterns) || null;
+
+        // Extract year from filename
+        const yearMatch = filename.match(/\b(19|20)\d{2}\b/);
+        const year = yearMatch ? yearMatch[0] : (result.year || null);
+
+        // Extract container/extension
+        const extMatch = filename.match(/\.(mkv|mp4|avi|mov|wmv|flv|webm)$/i);
+        const container = extMatch ? extMatch[1].toLowerCase() : null;
+        const extension = container;
+
+        // Season/Episode formatting
+        const season = result.season || null;
+        const episode = result.episode || null;
+        const seasons = season ? [season] : [];
+        const episodes = episode ? [episode] : [];
+        const pad = (n) => n?.toString().padStart(2, '0') || '';
+        const formattedSeasons = season ? `S${pad(season)}` : null;
+        const formattedEpisodes = episode ? `E${pad(episode)}` : null;
+        const seasonEpisode = [formattedSeasons, formattedEpisodes].filter(Boolean);
+        const seasonPack = result.isPack || /complete|stagione|season.?pack/i.test(fn);
+
+        // Flags (AIOStreams)
+        const remastered = /remaster(ed)?/i.test(fn);
+        const repack = /\brepack\b/i.test(fn);
+        const uncensored = /uncensored/i.test(fn);
+        const unrated = /unrated/i.test(fn);
+        const upscaled = /upscal(ed|e)?|\bai\b/i.test(fn);
+
+        // Language handling
+        const languageMap = {
+            'Italian': '🇮🇹', 'English': '🇬🇧', 'French': '🇫🇷', 'German': '🇩🇪',
+            'Spanish': '🇪🇸', 'Portuguese': '🇵🇹', 'Russian': '🇷🇺', 'Japanese': '🇯🇵',
+            'Korean': '🇰🇷', 'Chinese': '🇨🇳', 'Arabic': '🇸🇦', 'Hindi': '🇮🇳',
+            'Thai': '🇹🇭', 'Vietnamese': '🇻🇳', 'Indonesian': '🇮🇩', 'Turkish': '🇹🇷',
+            'Polish': '🇵🇱', 'Dutch': '🇳🇱', 'Swedish': '🇸🇪', 'Norwegian': '🇳🇴',
+            'Danish': '🇩🇰', 'Finnish': '🇫🇮', 'Greek': '🇬🇷', 'Czech': '🇨🇿',
+            'Hungarian': '🇭🇺', 'Romanian': '🇷🇴', 'Bulgarian': '🇧🇬', 'Ukrainian': '🇺🇦',
+            'Hebrew': '🇮🇱', 'Persian': '🇮🇷', 'Malay': '🇲🇾', 'Latino': '💃🏻',
+            'Multi': '🌎', 'ITA': '🇮🇹', 'ENG': '🇬🇧', 'FRA': '🇫🇷', 'GER': '🇩🇪'
+        };
+        const langCodeMap = {
+            'Italian': 'IT', 'English': 'EN', 'French': 'FR', 'German': 'DE',
+            'Spanish': 'ES', 'Portuguese': 'PT', 'Russian': 'RU', 'Japanese': 'JA',
+            'Korean': 'KO', 'Chinese': 'ZH', 'Arabic': 'AR', 'Hindi': 'HI',
+            'Multi': 'MUL', 'ITA': 'IT', 'ENG': 'EN'
+        };
+        // Small caps with mathematical monospace digits (same as AIOStreams)
+        const SMALL_CAPS = {
+            A: 'ᴀ', B: 'ʙ', C: 'ᴄ', D: 'ᴅ', E: 'ᴇ', F: 'ꜰ', G: 'ɢ', H: 'ʜ', I: 'ɪ',
+            J: 'ᴊ', K: 'ᴋ', L: 'ʟ', M: 'ᴍ', N: 'ɴ', O: 'ᴏ', P: 'ᴘ', Q: 'ǫ', R: 'ʀ',
+            S: 'ꜱ', T: 'ᴛ', U: 'ᴜ', V: 'ᴠ', W: 'ᴡ', X: '𝘅', Y: 'ʏ', Z: 'ᴢ',
+            '0': '𝟢', '1': '𝟣', '2': '𝟤', '3': '𝟥', '4': '𝟦', '5': '𝟧', '6': '𝟨', '7': '𝟩', '8': '𝟪', '9': '𝟫'
+        };
+        const makeSmall = (s) => s.split('').map(c => SMALL_CAPS[c.toUpperCase()] || c).join('');
+
+        // Resolution normalizer (AIOStreams-identical: always returns standardized format like "2160p")
+        const normalizeResolution = (res) => {
+            if (!res) return null;
+            const r = res.toLowerCase().replace(/\s/g, '');
+            if (/2160|4k|uhd/.test(r)) return '2160p';
+            if (/1440|2k|qhd/.test(r)) return '1440p';
+            if (/1080|fhd/.test(r)) return '1080p';
+            if (/720|hd(?!r)/.test(r)) return '720p';
+            if (/576/.test(r)) return '576p';
+            if (/480|sd/.test(r)) return '480p';
+            if (/360/.test(r)) return '360p';
+            return res; // Return as-is if not recognized
+        };
+
+        const languages = result.languages?.length ? result.languages :
+            extractMultiple(filename, { Italian: /\bita(lian)?\b/i, English: /\beng(lish)?\b/i, French: /\bfre(nch)?\b/i, German: /\bger(man)?\b|deu(tsch)?\b/i, Spanish: /\bspa(nish)?\b/i, Multi: /\bmulti\b/i });
+        const languageEmojis = result.languageEmojis?.length ? result.languageEmojis :
+            languages.map(l => languageMap[l] || l);
+        const languageCodes = languages.map(l => langCodeMap[l] || l.substring(0, 2).toUpperCase());
+        const smallLanguageCodes = languageCodes.map(c => makeSmall(c));
+
+        // wedontknowwhatakilometeris: AIOStreams joke field - replaces 🇬🇧 with 🇺🇸🦅 for Americans
+        const wedontknowwhatakilometeris = languageEmojis.map(e => e.replace('🇬🇧', '🇺🇸🦅'));
+
+        // Apply normalizeResolution to raw extracted resolution
+        const resolution = normalizeResolution(rawResolution) || rawResolution;
+
+        // Age formatting
+        const formatAge = (age) => {
+            if (!age) return null;
+            if (typeof age === 'number') {
+                if (age < 24) return `${age}h`;
+                if (age < 24 * 7) return `${Math.round(age / 24)}d`;
+                if (age < 24 * 30) return `${Math.round(age / (24 * 7))}w`;
+                return `${Math.round(age / (24 * 30))}mo`;
+            }
+            return age;
+        };
+
+        // Build complete data object
+        // Determine proper filename and folderName
+        // For packs: folderName = torrent title, filename = specific file
+        // For single files: folderName = empty, filename = file name
+        const isPack = result.fileIndex !== undefined && result.file_title && result.file_title !== result.title;
+        let actualFilename = result.file_title || result.filename || result.title || '';
+
+        console.log(`🔍 [DEBUG-FMT] Raw actualFilename: "${actualFilename}"`);
+
+        // Fix: If filename contains path separator, take only the clean filename
+        if (actualFilename && actualFilename.includes('/')) {
+            const original = actualFilename;
+            actualFilename = actualFilename.split('/').pop();
+            console.log(`🧹 [DEBUG-FMT] Cleaned filename: "${original}" -> "${actualFilename}"`);
+        } else {
+            console.log(`ℹ️ [DEBUG-FMT] No slash found in filename`);
+        }
+
+        const actualFolderName = isPack ? (result.title || '') : (result.folderName || '');
+
+        // ✅ Smart Title Logic (User Request)
+        // 1. Single Movie/Episode: Show ONLY the filename (actualFilename)
+        // 2. Packs: Show "Pack Name / File Name"
+        let displayTitle = result.title || result.filename || '';
+        if (actualFilename) {
+            if (!isPack) {
+                // Single: Use filename only
+                displayTitle = actualFilename;
+            } else {
+                // Pack: Combine Pack + File
+                displayTitle = `${result.title || 'Pack'} / ${actualFilename}`;
+            }
+        }
+
+        const data = {
+            config: {
+                addonName: 'IlCorsaroViola'
+            },
+            stream: {
+                // Basic - properly separated folder and file
+                filename: actualFilename,
+                folderName: isPack ? actualFolderName : '',
+                title: displayTitle,
+                // ✅ Use numeric bytes, not formatted strings like "10.5 GB"
+                size: Number(result.file_size || result.sizeInBytes || result.matchedFileSize || 0),
+                folderSize: Number(result.packSize || result.sizeInBytes || 0),
+                library: false,
+
+                // Quality info
+                quality: quality,
+                resolution: resolution,
+                encode: encode,
+                codec: encode,
+
+                // Languages (all variants)
+                languages: languages,
+                uLanguages: languages,
+                languageEmojis: languageEmojis,
+                uLanguageEmojis: languageEmojis,
+                languageCodes: languageCodes,
+                uLanguageCodes: languageCodes,
+                smallLanguageCodes: smallLanguageCodes,
+                uSmallLanguageCodes: smallLanguageCodes,
+                wedontknowwhatakilometeris: wedontknowwhatakilometeris,
+                uWedontknowwhatakilometeris: wedontknowwhatakilometeris,
+
+                // Tags
+                visualTags: visualTags,
+                audioTags: audioTags,
+                audioChannels: audioChannels,
+                releaseGroup: result.groupTag || result.releaseGroup || result.group || '',
+                regexMatched: null,
+
+                // Episode info
+                year: year,
+                seasons: seasons,
+                season: season,
+                formattedSeasons: formattedSeasons,
+                episodes: episodes,
+                episode: episode,
+                formattedEpisodes: formattedEpisodes,
+                seasonEpisode: seasonEpisode,
+                seasonPack: seasonPack,
+
+                // Metadata
+                edition: edition,
+                remastered: remastered,
+                repack: repack,
+                uncensored: uncensored,
+                unrated: unrated,
+                upscaled: upscaled,
+                network: network,
+                container: container,
+                extension: extension,
+
+                // Torrent info
+                seeders: result.seeders || 0,
+                private: false,
+                age: formatAge(result.uploadTime || result.ageHours) || result.age || '',
+                ageHours: result.ageHours || null,
+                duration: result.duration || 0,
+                infoHash: result.infoHash || null,
+
+                // Stream type
+                type: isCached ? 'Debrid' : (result.type || 'p2p'),
+                message: null,
+                proxied: false,
+                seadex: false,
+                seadexBest: false,
+
+                // ICV specific backwards compat
+                source: quality || result.source || '',
+                audio: audioTags.length ? audioTags[0] : '',
+                cached: isCached,
+                isPack: seasonPack,
+                packSize: result.packSize || result.size || 0,
+                indexer: result.provider || result.source || ''
+            },
+            service: {
+                id: serviceName.toLowerCase(),
+                name: serviceName === 'RD' ? 'Real-Debrid' : (serviceName === 'TB' ? 'Torbox' : (serviceName === 'AD' ? 'AllDebrid' : serviceName)),
+                shortName: serviceName,
+                cached: isCached
+            },
+            addon: {
+                name: 'IlCorsaroViola',
+                version: '3.0.0',
+                presetId: preset,
+                manifestUrl: null
+            },
+            tools: {
+                newLine: '\n',
+                removeLine: ''
+            }
+        };
+
+        // Apply templates
+        if (templates.name) {
+            stream.name = customFormatter.parseTemplate(templates.name, data);
+        }
+        if (templates.description) {
+            stream.title = customFormatter.parseTemplate(templates.description, data);
+        }
+    } catch (e) {
+        console.error('⚠️ [Formatter] Error applying custom format:', e.message);
+    }
+
+    return stream;
+}
 
 // ✅ Enhanced Query Cleaning (from uiai.js)
 function cleanSearchQuery(query) {
@@ -2758,21 +3148,44 @@ class Torbox {
             const data = await response.json();
 
             if (data.success && data.data) {
-                // Torrentio uses format=list, so data.data is an array of cached entries
-                const cachedHashes = new Set(
-                    (Array.isArray(data.data) ? data.data : [])
-                        .map(entry => entry.hash?.toLowerCase())
-                        .filter(Boolean)
-                );
+                // Build a map for quick lookup
+                const cachedEntriesMap = new Map();
+                (Array.isArray(data.data) ? data.data : []).forEach(entry => {
+                    if (entry.hash) {
+                        cachedEntriesMap.set(entry.hash.toLowerCase(), entry);
+                    }
+                });
+
+                // Video extensions to look for
+                const videoExtensions = /\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts|mpg|mpeg)$/i;
 
                 hashes.forEach(hash => {
                     const hashLower = hash.toLowerCase();
-                    const isCached = cachedHashes.has(hashLower);
+                    const cachedEntry = cachedEntriesMap.get(hashLower);
+                    const isCached = !!cachedEntry;
+
+                    // Extract main video file name and size if cached
+                    let mainFileName = null;
+                    let mainFileSize = null;
+
+                    if (isCached && cachedEntry.files && Array.isArray(cachedEntry.files)) {
+                        // Find video files and sort by size (largest is usually the main file)
+                        const videoFiles = cachedEntry.files
+                            .filter(f => videoExtensions.test(f.name || f.short_name || ''))
+                            .sort((a, b) => (b.size || 0) - (a.size || 0));
+
+                        if (videoFiles.length > 0) {
+                            mainFileName = videoFiles[0].name || videoFiles[0].short_name;
+                            mainFileSize = videoFiles[0].size || 0;
+                        }
+                    }
 
                     results[hashLower] = {
                         cached: isCached,
                         downloadLink: null,
-                        service: 'Torbox'
+                        service: 'Torbox',
+                        file_title: mainFileName,  // ✅ Add main video filename
+                        file_size: mainFileSize    // ✅ Add main video file size
                     };
                 });
             }
@@ -5707,7 +6120,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 const episodeNum = parseInt(episode);
                 const seriesImdbId = mediaDetails.imdbId;
                 const MAX_PACK_VERIFY = 20;
-                const DELAY_MS = 100;
+                const DELAY_MS = 200; // Balance between rate limiting and speed
 
                 // Separate verified (in DB) from unverified packs
                 const verifiedPacks = [];
@@ -6251,7 +6664,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 const episodeNum = parseInt(episode);
                 const seriesImdbId = mediaDetails.imdbId;
                 const MAX_PACK_VERIFY = 20;
-                const DELAY_MS = 100;
+                const DELAY_MS = 200; // Balance between rate limiting and speed
 
                 // Separate verified from unverified packs
                 const verifiedPacks = [];
@@ -6486,7 +6899,12 @@ async function handleStream(type, id, config, workerOrigin) {
                         // If cached=false or undefined, we should re-check
                         const isConfirmedCached = dbCachedResults[h]?.cached === true;
                         const inUserDownloaded = userDownloadedHashes.has(h);
-                        return !isConfirmedCached && !inUserDownloaded;
+
+                        // ✅ NEW: Also re-check if cached but missing file_title (for packs)
+                        const hasFileTitle = !!dbCachedResults[h]?.file_title;
+                        const needsFileTitle = isConfirmedCached && !hasFileTitle;
+
+                        return (!isConfirmedCached && !inUserDownloaded) || needsFileTitle;
                     });
 
                     if (uncachedHashes.length > 0 && config.rd_key) {
@@ -6518,11 +6936,13 @@ async function handleStream(type, id, config, workerOrigin) {
                                 if (dbEnabled) {
                                     const liveResultsToSave = Object.entries(liveCheckResults).map(([hash, data]) => ({
                                         hash,
-                                        cached: data.cached
+                                        cached: data.cached,
+                                        file_title: data.file_title || null,  // ✅ Save file_title for deduplication
+                                        file_size: data.file_size || null     // ✅ Save file_size
                                     }));
                                     if (liveResultsToSave.length > 0) {
                                         await dbHelper.updateRdCacheStatus(liveResultsToSave);
-                                        console.log(`💾 [DB] Saved ${liveResultsToSave.length} live check results to DB`);
+                                        console.log(`💾 [DB] Saved ${liveResultsToSave.length} live check results to DB (with file info)`);
                                     }
                                 }
                             }
@@ -6629,6 +7049,18 @@ async function handleStream(type, id, config, workerOrigin) {
                     const rdCacheData = rdCacheResults[infoHashLower];
                     const rdUserTorrent = rdUserTorrents.find(t => t.hash?.toLowerCase() === infoHashLower);
 
+                    // ✅ Populate file_title from cache only for MOVIES
+                    // For series, resolveSeriesPackFile already set the correct episode file_title
+                    // Cache returns the largest file which is wrong for series packs
+                    if (type === 'movie') {
+                        if (!result.file_title && rdCacheData?.file_title) {
+                            result.file_title = rdCacheData.file_title;
+                            console.log(`📄 [RD] Using cached file_title (movie): ${result.file_title.substring(0, 40)}...`);
+                        } else if (result.file_title) {
+                            console.log(`📄 [RD] Using DB file_title (movie): ${result.file_title.substring(0, 40)}...`);
+                        }
+                    }
+
                     let streamUrl = '';
                     let cacheType = 'none';
                     let streamError = null;
@@ -6693,25 +7125,73 @@ async function handleStream(type, id, config, workerOrigin) {
                     let titleLine1 = '';
                     let titleLine2 = '';
 
-                    // ✅ FIX: A pack is ONLY when the title indicates a season pack, NOT just having fileIndex
-                    // fileIndex is now also set for single episodes after verification
-                    const isPack = packFilesHandler.isSeasonPack(result.title);
+                    // ✅ Define isPack at top level for size calculation
+                    // Relaxed check: valid if we have specific file_title differing from torrent title
+                    const isPack = type === 'movie'
+                        ? (result.file_title && result.file_title !== result.title)
+                        : packFilesHandler.isSeasonPack(result.title);
 
-                    if (isPack) {
-                        titleLine1 = `🗳️ ${result.title}`;
-                        // If we have a specific file title (from DB or constructed), show it
-                        if (result.file_title) {
-                            titleLine2 = `📂 ${result.file_title}`;
-                        } else if (type === 'series' && season && episode && mediaDetails) {
-                            const seasonStr = String(season).padStart(2, '0');
-                            const episodeStr = String(episode).padStart(2, '0');
-                            titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                    // ✅ MOVIE/SERIES TITLE DISPLAY
+                    // Logic: Single file = only filename, Pack = pack name / file name
+                    const cleanFileTitle = result.file_title ? result.file_title.split('/').pop() : '';
+                    const cleanMainFilename = (result.file_title || result.filename || result.title || '').split('/').pop();
+
+                    if (type === 'movie') {
+                        if (isPack) {
+                            // Pack: For AIOStreams, put pack on first line, file on second (AIO parses first line as context)
+                            if (config.aiostreams_mode) {
+                                // AIOStreams format: Pack name on line 1, file on line 2
+                                // behaviorHints.filename provides the actual filename for parsing
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${cleanFileTitle}`;
+                            } else {
+                                // Normal mode: pack first, file second
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${cleanFileTitle}`;
+                            }
                         } else {
-                            titleLine2 = `📂 ${result.filename || result.title}`;
+                            // Single movie: show ONLY the filename
+                            titleLine1 = `🎬 ${cleanMainFilename}`;
                         }
                     } else {
-                        titleLine1 = `🎬 ${result.title}`;
+                        // SERIES logic
+                        if (isPack) {
+                            if (result.file_title) {
+                                // Pack with resolved file title
+                                if (config.aiostreams_mode) {
+                                    // AIOStreams: pack on line 1, file on line 2
+                                    titleLine1 = `🗳️ ${result.title}`;
+                                    titleLine2 = `📂 ${cleanFileTitle}`;
+                                } else {
+                                    // Normal mode: pack first, file second
+                                    titleLine1 = `🗳️ ${result.title}`;
+                                    titleLine2 = `📂 ${cleanFileTitle}`;
+                                }
+                            } else if (season && episode && mediaDetails) {
+                                const seasonStr = String(season).padStart(2, '0');
+                                const episodeStr = String(episode).padStart(2, '0');
+                                if (config.aiostreams_mode) {
+                                    titleLine1 = `🗳️ ${result.title}`;
+                                    titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                                } else {
+                                    titleLine1 = `🗳️ ${result.title}`;
+                                    titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                                }
+                            } else {
+                                if (config.aiostreams_mode) {
+                                    titleLine1 = `🗳️ ${result.title}`;
+                                    titleLine2 = `📂 ${cleanMainFilename}`;
+                                } else {
+                                    titleLine1 = `🗳️ ${result.title}`;
+                                    titleLine2 = `📂 ${cleanMainFilename}`;
+                                }
+                            }
+                        } else {
+                            // Single episode: show ONLY the filename
+                            titleLine1 = `🎬 ${cleanMainFilename}`;
+                        }
                     }
+
 
                     // ✅ SIZE DISPLAY: Show "pack / episode" format like MediaFusion when we have both sizes
                     let sizeLine;
@@ -6728,7 +7208,14 @@ async function handleStream(type, id, config, workerOrigin) {
 
                     if (isPack && episodeSize > 0 && packSize > 0 && episodeSize < packSize) {
                         // Pack with known episode size: show both
-                        sizeLine = `💾 ${formatBytes(packSize)} / ${formatBytes(episodeSize)}`;
+                        // ✅ AIOStreams: Use separate line for folderSize so regex can potentially extract it
+                        if (config.aiostreams_mode) {
+                            // Format: "💾 pack / file" - AIOStreams extracts first size as stream.size
+                            // But we want file size as stream.size, so put it first
+                            sizeLine = `💾 ${formatBytes(episodeSize)} / 📂 ${formatBytes(packSize)}`;
+                        } else {
+                            sizeLine = `💾 ${formatBytes(packSize)} / ${formatBytes(episodeSize)}`;
+                        }
                         console.log(`✅ [SIZE LINE] DUAL format: "${sizeLine}" (isPack=${isPack}, ep=${episodeSize}, pack=${packSize})`);
                     } else {
                         // Single file or pack without episode size
@@ -6777,9 +7264,20 @@ async function handleStream(type, id, config, workerOrigin) {
                         title: streamTitle,
                         infoHash: result.infoHash,
                         url: streamUrl,
+                        // AIOStreams: Explicitly pass sizes at root level if needed (Ensure NUMBER)
+                        size: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0),
+                        folderSize: Number(result.packSize || result.sizeInBytes || 0),
+                        // ✅ AIOStreams: Add folderName and filename at ROOT level for templates
+                        ...(isPack && result.title ? { folderName: result.title } : {}),
+                        ...(cleanMainFilename ? { filename: cleanMainFilename } : {}),
                         behaviorHints: {
                             bingeGroup: 'uindex-realdebrid-optimized',
-                            notWebReady: false
+                            notWebReady: false,
+                            // AIOStreams compatibility: provide file size and name for dedup
+                            ...(result.size ? { videoSize: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0) } : {}),
+                            ...(cleanMainFilename ? { filename: cleanMainFilename } : {}),
+                            // ✅ AIOStreams: Add folderName for pack torrents (pack title = folder, file_title = filename)
+                            ...(isPack && result.title ? { folderName: result.title } : {})
                         },
                         _meta: {
                             infoHash: result.infoHash,
@@ -6798,6 +7296,9 @@ async function handleStream(type, id, config, workerOrigin) {
                         rdStream.fileIdx = result.fileIndex;
                     }
 
+                    // ✅ Apply custom formatter if configured
+                    applyCustomFormatter(rdStream, result, config, 'RD', isCached);
+
                     streams.push(rdStream);
                 }
 
@@ -6805,6 +7306,21 @@ async function handleStream(type, id, config, workerOrigin) {
                 if (useTorbox) {
                     const torboxCacheData = torboxCacheResults[infoHashLower];
                     const torboxUserTorrent = torboxUserTorrents.find(t => t.hash?.toLowerCase() === infoHashLower);
+
+                    // ✅ Populate file_title from cache only for MOVIES
+                    // For series, resolveSeriesPackFile already set the correct episode file_title  
+                    // Cache returns the largest file which is wrong for series packs
+                    if (type === 'movie' && !result.file_title) {
+                        // Try Torbox cache first, then RD cache (cross-debrid sharing)
+                        if (torboxCacheData?.file_title) {
+                            result.file_title = torboxCacheData.file_title;
+                            console.log(`📄 [Torbox] Using Torbox cached file_title (movie): ${result.file_title.substring(0, 40)}...`);
+                        } else if (rdCacheResults[infoHashLower]?.file_title) {
+                            // ✅ Use RD-extracted file_title for Torbox streams (cross-debrid benefit!)
+                            result.file_title = rdCacheResults[infoHashLower].file_title;
+                            console.log(`📄 [Torbox] Using RD cached file_title (movie): ${result.file_title.substring(0, 40)}...`);
+                        }
+                    }
 
                     let streamUrl = '';
                     let cacheType = 'none';
@@ -6862,21 +7378,58 @@ async function handleStream(type, id, config, workerOrigin) {
                     let titleLine1 = '';
                     let titleLine2 = '';
 
-                    const isPack = packFilesHandler.isSeasonPack(result.title);
+                    // ✅ Define isPack at top level for size calculation
+                    // Relaxed check: valid if we have specific file_title differing from torrent title
+                    const isPack = type === 'movie'
+                        ? (result.file_title && result.file_title !== result.title)
+                        : packFilesHandler.isSeasonPack(result.title);
 
-                    if (isPack) {
-                        titleLine1 = `🗳️ ${result.title}`;
-                        if (result.file_title) {
-                            titleLine2 = `📂 ${result.file_title}`;
-                        } else if (type === 'series' && season && episode && mediaDetails) {
-                            const seasonStr = String(season).padStart(2, '0');
-                            const episodeStr = String(episode).padStart(2, '0');
-                            titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                    // ✅ MOVIE/SERIES TITLE DISPLAY
+                    // Logic: Single file = only filename, Pack = pack name + file name
+                    const cleanFileTitle = result.file_title ? result.file_title.split('/').pop() : '';
+                    const cleanMainFilename = (result.file_title || result.filename || result.title || '').split('/').pop();
+
+                    if (type === 'movie') {
+                        if (isPack) {
+                            // Movie collection: show BOTH pack and file (pack first, file second for consistency)
+                            if (config.aiostreams_mode) {
+                                // AIOStreams: pack on line 1, file on line 2 (matches RD format)
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${cleanFileTitle}`;
+                            } else {
+                                // Normal mode: pack first, then file
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${cleanFileTitle}`;
+                            }
                         } else {
-                            titleLine2 = `📂 ${result.filename || result.title}`;
+                            // Single movie: show ONLY the filename (not the torrent name)
+                            titleLine1 = `🎬 ${cleanMainFilename}`;
                         }
                     } else {
-                        titleLine1 = `🎬 ${result.title}`;
+                        // SERIES logic
+                        if (isPack) {
+                            // Season pack: show BOTH pack and episode file
+                            if (config.aiostreams_mode && result.file_title) {
+                                // AIOStreams: pack on line 1, file on line 2 (matches RD format)
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${cleanFileTitle}`;
+                            } else {
+                                // Normal mode: pack first, then file
+                                titleLine1 = `🗳️ ${result.title}`;
+                                if (result.file_title) {
+                                    titleLine2 = `📂 ${cleanFileTitle}`;
+                                } else if (season && episode && mediaDetails) {
+                                    const seasonStr = String(season).padStart(2, '0');
+                                    const episodeStr = String(episode).padStart(2, '0');
+                                    titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                                } else {
+                                    titleLine2 = `📂 ${cleanMainFilename}`;
+                                }
+                            }
+                        } else {
+                            // Single episode: show ONLY the filename (not the torrent name)
+                            titleLine1 = `🎬 ${cleanMainFilename}`;
+                        }
                     }
 
                     // Size display with pack/episode format
@@ -6884,7 +7437,12 @@ async function handleStream(type, id, config, workerOrigin) {
                     const packSize = result.packSize || 0;
                     const episodeSize = result.file_size || 0;
                     if (isPack && episodeSize > 0 && packSize > 0 && episodeSize < packSize) {
-                        sizeLine = `💾 ${formatBytes(packSize)} / ${formatBytes(episodeSize)}`;
+                        // ✅ AIOStreams: File size first, pack size second with different emoji
+                        if (config.aiostreams_mode) {
+                            sizeLine = `💾 ${formatBytes(episodeSize)} / 📂 ${formatBytes(packSize)}`;
+                        } else {
+                            sizeLine = `💾 ${formatBytes(packSize)} / ${formatBytes(episodeSize)}`;
+                        }
                     } else {
                         sizeLine = `💾 ${result.size || 'Unknown'}`;
                     }
@@ -6923,9 +7481,20 @@ async function handleStream(type, id, config, workerOrigin) {
                         title: streamTitle,
                         infoHash: result.infoHash,
                         url: streamUrl,
+                        // AIOStreams: Explicitly pass sizes at root level (Ensure NUMBER)
+                        size: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0),
+                        folderSize: Number(result.packSize || result.sizeInBytes || 0),
+                        // ✅ AIOStreams: Add folderName and filename at ROOT level for templates
+                        ...(isPack && result.title ? { folderName: result.title } : {}),
+                        ...(cleanMainFilename ? { filename: cleanMainFilename } : {}),
                         behaviorHints: {
                             bingeGroup: 'uindex-torbox-optimized',
-                            notWebReady: false
+                            notWebReady: false,
+                            // AIOStreams compatibility
+                            ...(result.size ? { videoSize: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0) } : {}),
+                            ...(cleanMainFilename ? { filename: cleanMainFilename } : {}),
+                            // ✅ AIOStreams: Add folderName for pack torrents
+                            ...(isPack && result.title ? { folderName: result.title } : {})
                         },
                         _meta: {
                             infoHash: result.infoHash,
@@ -6942,6 +7511,9 @@ async function handleStream(type, id, config, workerOrigin) {
                     if (result.fileIndex !== null && result.fileIndex !== undefined) {
                         torboxStream.fileIdx = result.fileIndex;
                     }
+
+                    // ✅ Apply custom formatter if configured
+                    applyCustomFormatter(torboxStream, result, config, 'TB', isCached);
 
                     streams.push(torboxStream);
                 }
@@ -6993,21 +7565,57 @@ async function handleStream(type, id, config, workerOrigin) {
                     let titleLine1 = '';
                     let titleLine2 = '';
 
-                    const isPack = packFilesHandler.isSeasonPack(result.title);
+                    // ✅ Define isPack at top level for size calculation
+                    const isPack = type === 'movie'
+                        ? (result.fileIndex !== undefined && result.file_title && result.file_title !== result.title)
+                        : packFilesHandler.isSeasonPack(result.title);
 
-                    if (isPack) {
-                        titleLine1 = `🗳️ ${result.title}`;
-                        if (result.file_title) {
-                            titleLine2 = `📂 ${result.file_title}`;
-                        } else if (type === 'series' && season && episode && mediaDetails) {
-                            const seasonStr = String(season).padStart(2, '0');
-                            const episodeStr = String(episode).padStart(2, '0');
-                            titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                    // ✅ MOVIE/SERIES TITLE DISPLAY
+                    // Logic: Single file = only filename, Pack = pack name + file name
+                    const cleanFileTitle = result.file_title ? result.file_title.split('/').pop() : '';
+                    const cleanMainFilename = (result.file_title || result.filename || result.title || '').split('/').pop();
+
+                    if (type === 'movie') {
+                        if (isPack) {
+                            // Movie collection: show BOTH pack and file
+                            if (config.aiostreams_mode) {
+                                // AIO mode: file first, then pack
+                                titleLine1 = `📂 ${cleanFileTitle}`;
+                                titleLine2 = `🗳️ ${result.title}`;
+                            } else {
+                                // Normal mode: pack first, then file
+                                titleLine1 = `🗳️ ${result.title}`;
+                                titleLine2 = `📂 ${cleanFileTitle}`;
+                            }
                         } else {
-                            titleLine2 = `📂 ${result.filename || result.title}`;
+                            // Single movie: show ONLY the filename (not the torrent name)
+                            titleLine1 = `🎬 ${cleanMainFilename}`;
                         }
                     } else {
-                        titleLine1 = `🎬 ${result.title}`;
+                        // SERIES logic
+                        if (isPack) {
+                            // Season pack: show BOTH pack and episode file
+                            if (config.aiostreams_mode && result.file_title) {
+                                // AIO mode: file first, then pack
+                                titleLine1 = `📂 ${cleanFileTitle}`;
+                                titleLine2 = `🗳️ ${result.title}`;
+                            } else {
+                                // Normal mode: pack first, then file
+                                titleLine1 = `🗳️ ${result.title}`;
+                                if (result.file_title) {
+                                    titleLine2 = `📂 ${cleanFileTitle}`;
+                                } else if (season && episode && mediaDetails) {
+                                    const seasonStr = String(season).padStart(2, '0');
+                                    const episodeStr = String(episode).padStart(2, '0');
+                                    titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                                } else {
+                                    titleLine2 = `📂 ${cleanMainFilename}`;
+                                }
+                            }
+                        } else {
+                            // Single episode: show ONLY the filename (not the torrent name)
+                            titleLine1 = `🎬 ${cleanMainFilename}`;
+                        }
                     }
 
                     // Size display with pack/episode format
@@ -7015,7 +7623,12 @@ async function handleStream(type, id, config, workerOrigin) {
                     const packSize = result.packSize || 0;
                     const episodeSize = result.file_size || 0;
                     if (isPack && episodeSize > 0 && packSize > 0 && episodeSize < packSize) {
-                        sizeLine = `💾 ${formatBytes(packSize)} / ${formatBytes(episodeSize)}`;
+                        // ✅ AIOStreams: File size first, pack size second with different emoji
+                        if (config.aiostreams_mode) {
+                            sizeLine = `💾 ${formatBytes(episodeSize)} / 📂 ${formatBytes(packSize)}`;
+                        } else {
+                            sizeLine = `💾 ${formatBytes(packSize)} / ${formatBytes(episodeSize)}`;
+                        }
                     } else {
                         sizeLine = `💾 ${result.size || 'Unknown'}`;
                     }
@@ -7054,9 +7667,15 @@ async function handleStream(type, id, config, workerOrigin) {
                         title: streamTitle,
                         infoHash: result.infoHash,
                         url: streamUrl,
+                        // AIOStreams (Ensure NUMBER)
+                        size: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0),
+                        folderSize: Number(result.packSize || result.sizeInBytes || 0),
                         behaviorHints: {
                             bingeGroup: 'uindex-alldebrid-optimized',
-                            notWebReady: false
+                            notWebReady: false,
+                            // AIOStreams compatibility
+                            ...(result.size ? { videoSize: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0) } : {}),
+                            ...(cleanMainFilename ? { filename: cleanMainFilename } : {})
                         },
                         _meta: {
                             infoHash: result.infoHash,
@@ -7104,21 +7723,43 @@ async function handleStream(type, id, config, workerOrigin) {
                     let titleLine1 = '';
                     let titleLine2 = '';
 
-                    const isPack = packFilesHandler.isSeasonPack(result.title);
+                    // ✅ Define isPack at top level for size calculation
+                    const isPack = type === 'movie'
+                        ? (result.fileIndex !== undefined && result.file_title && result.file_title !== result.title)
+                        : packFilesHandler.isSeasonPack(result.title);
 
-                    if (isPack) {
-                        titleLine1 = `🗳️ ${result.title}`;
-                        if (result.file_title) {
-                            titleLine2 = `📂 ${result.file_title}`;
-                        } else if (type === 'series' && season && episode && mediaDetails) {
-                            const seasonStr = String(season).padStart(2, '0');
-                            const episodeStr = String(episode).padStart(2, '0');
-                            titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                    // ✅ MOVIE/SERIES TITLE DISPLAY
+                    // Logic: Single file = only filename, Pack = pack name + file name
+                    const cleanFileTitle = result.file_title ? result.file_title.split('/').pop() : '';
+                    const cleanMainFilename = (result.file_title || result.filename || result.title || '').split('/').pop();
+
+                    if (type === 'movie') {
+                        if (isPack) {
+                            // Movie collection: show BOTH pack and file
+                            titleLine1 = `🗳️ ${result.title}`;
+                            titleLine2 = `📂 ${cleanFileTitle}`;
                         } else {
-                            titleLine2 = `📂 ${result.filename || result.title}`;
+                            // Single movie: show ONLY the filename (not the torrent name)
+                            titleLine1 = `🎬 ${cleanMainFilename}`;
                         }
                     } else {
-                        titleLine1 = `🎬 ${result.title}`;
+                        // SERIES logic
+                        if (isPack) {
+                            // Season pack: show BOTH pack and episode file
+                            titleLine1 = `🗳️ ${result.title}`;
+                            if (result.file_title) {
+                                titleLine2 = `📂 ${cleanFileTitle}`;
+                            } else if (season && episode && mediaDetails) {
+                                const seasonStr = String(season).padStart(2, '0');
+                                const episodeStr = String(episode).padStart(2, '0');
+                                titleLine2 = `📂 ${mediaDetails.title} S${seasonStr}E${episodeStr}`;
+                            } else {
+                                titleLine2 = `📂 ${cleanMainFilename}`;
+                            }
+                        } else {
+                            // Single episode: show ONLY the filename (not the torrent name)
+                            titleLine1 = `🎬 ${cleanMainFilename}`;
+                        }
                     }
 
                     // Size display with pack/episode format
@@ -7132,7 +7773,12 @@ async function handleStream(type, id, config, workerOrigin) {
                     }
 
                     if (isPack && episodeSize > 0 && packSize > 0 && episodeSize < packSize) {
-                        sizeLine = `💾 ${formatBytes(packSize)} / ${formatBytes(episodeSize)}`;
+                        // ✅ AIOStreams: File size first, pack size second with different emoji
+                        if (config.aiostreams_mode) {
+                            sizeLine = `💾 ${formatBytes(episodeSize)} / 📂 ${formatBytes(packSize)}`;
+                        } else {
+                            sizeLine = `💾 ${formatBytes(packSize)} / ${formatBytes(episodeSize)}`;
+                        }
                     } else {
                         sizeLine = `💾 ${result.size || 'Unknown'}`;
                     }
@@ -7170,9 +7816,17 @@ async function handleStream(type, id, config, workerOrigin) {
                         name: streamName,
                         title: streamTitle,
                         infoHash: result.infoHash,
+
+                        // AIOStreams (Ensure NUMBER)
+                        size: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0),
+                        folderSize: Number(result.packSize || result.sizeInBytes || 0),
+
                         behaviorHints: {
                             bingeGroup: 'uindex-p2p',
-                            notWebReady: true
+                            notWebReady: true,
+                            // AIOStreams compatibility
+                            ...(result.size ? { videoSize: isPack ? Number(result.file_size || result.sizeInBytes || 0) : Number(result.sizeInBytes || 0) } : {}),
+                            ...(cleanMainFilename ? { filename: cleanMainFilename } : {})
                         },
                         _meta: { infoHash: result.infoHash, cached: false, quality: result.quality, seeders: result.seeders }
                     };
@@ -7184,6 +7838,9 @@ async function handleStream(type, id, config, workerOrigin) {
                     }
 
                     streams.push(p2pStream);
+
+                    // ✅ Apply custom formatter if configured (same as RD/TB)
+                    applyCustomFormatter(p2pStream, result, config, 'P2P', false);
                 }
 
             } catch (error) {
@@ -7743,7 +8400,20 @@ export default async function handler(req, res) {
             if (pathParts.length >= 3 && pathParts[1] && pathParts[1] !== 'manifest.json') {
                 try {
                     const encodedConfigStr = pathParts[1];
-                    const config = JSON.parse(atob(encodedConfigStr));
+                    let config;
+                    try {
+                        config = JSON.parse(atob(encodedConfigStr));
+                    } catch (e1) {
+                        console.warn('⚠️ Standard config parsing failed, trying URI decode fallback:', e1.message);
+                        try {
+                            // Fallback for double-encoded or legacy formats
+                            const decoded = atob(encodedConfigStr);
+                            config = JSON.parse(decodeURIComponent(escape(decoded)));
+                        } catch (e2) {
+                            console.error('❌ Config parsing failed completely:', e2.message);
+                            throw e1; // Re-throw original error
+                        }
+                    }
 
                     // Determine which debrid services are configured
                     const hasRD = config.rd_key && config.rd_key.length > 0;
@@ -7778,7 +8448,7 @@ export default async function handler(req, res) {
                 id: 'community.ilcorsaroviola.ita',
                 version: '3.0.0',
                 name: addonName,
-                description: 'Torrent da CorsaroNero DB local, Knaben e tanti altri con supporto Jackettio con o senza Real-Debrid, Torbox.',
+                description: 'Streaming da UIndex, CorsaroNero DB local, Knaben e Jackettio con o senza Real-Debrid, Torbox e Alldebrid.',
                 logo: 'https://i.imgur.com/kZK4KKS.png',
                 resources: ['stream'],
                 types: ['movie', 'series', 'anime'],
@@ -7840,6 +8510,7 @@ export default async function handler(req, res) {
             // Passa la configurazione estratta (o un oggetto vuoto) a handleStream.
             // Usa solo la configurazione dall'URL, senza fallback.
             const result = await handleStream(type, id, config, url.origin);
+
             const responseTime = Date.now() - startTime;
 
             console.log(`✅ Stream request completed in ${responseTime}ms`);
@@ -8352,14 +9023,13 @@ export default async function handler(req, res) {
                         return res.redirect(302, `${TORRENTIO_VIDEO_BASE}/videos/download_failed_v2.mp4`);
                     }
 
-                    // ✅ CACHE SUCCESS: Mark torrent as cached in DB (5-day TTL)
+                    // ✅ CACHE SUCCESS: Refresh cache timestamp (+10 days from now)
                     if (dbEnabled && infoHash) {
                         try {
-                            // Update cache status only (not file-specific data)
-                            await dbHelper.updateRdCacheStatus([{ hash: infoHash, cached: true }]);
-                            console.log(`💾 [DB] Marked ${infoHash} as RD cached (5-day TTL)`);
+                            // Refresh cache timestamp - extends validity to 10 more days
+                            await dbHelper.refreshRdCacheTimestamp(infoHash);
                         } catch (dbErr) {
-                            console.error(`❌ [DB] Error updating DB: ${dbErr.message}`, dbErr);
+                            console.error(`❌ [DB] Error refreshing cache: ${dbErr.message}`, dbErr);
                         }
 
                         // ✅ SAVE FILE INFO: Save ALL files from the pack for future lookups
