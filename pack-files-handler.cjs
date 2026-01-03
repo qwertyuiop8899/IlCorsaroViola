@@ -257,9 +257,11 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
  * @param {string} seriesImdbId - IMDb ID della serie
  * @param {number} targetSeason - Stagione target
  * @param {Object} dbHelper - Modulo db-helper
+ * @param {string} torrentTitle - Titolo del torrent (per inserire nella tabella torrents)
+ * @param {number} totalPackSize - Dimensione totale del pack
  * @returns {Promise<Array>} File processati
  */
-async function processSeriesPackFiles(files, infoHash, seriesImdbId, targetSeason, dbHelper) {
+async function processSeriesPackFiles(files, infoHash, seriesImdbId, targetSeason, dbHelper, torrentTitle = null, totalPackSize = 0) {
     const videoFiles = files.filter(f => isVideoFile(f.path));
     const processedFiles = [];
 
@@ -284,7 +286,27 @@ async function processSeriesPackFiles(files, infoHash, seriesImdbId, targetSeaso
         }
     }
 
-    // Salva nel DB
+    // 🔧 FIX: Insert parent torrent FIRST to satisfy FK constraint
+    if (processedFiles.length > 0 && dbHelper && typeof dbHelper.insertTorrent === 'function' && torrentTitle) {
+        try {
+            await dbHelper.insertTorrent({
+                infoHash: infoHash.toLowerCase(),
+                title: torrentTitle,
+                provider: 'pack-handler',
+                size: totalPackSize || null,
+                type: 'series',
+                seeders: 0,
+                imdbId: seriesImdbId
+            });
+        } catch (error) {
+            // Ignore if already exists - that's fine, FK should work
+            if (!error.message.includes('already exists')) {
+                console.warn(`⚠️ [PACK-HANDLER] Parent torrent insert warning: ${error.message}`);
+            }
+        }
+    }
+
+    // Salva i file nel DB
     if (processedFiles.length > 0 && dbHelper && typeof dbHelper.insertEpisodeFiles === 'function') {
         try {
             const inserted = await dbHelper.insertEpisodeFiles(processedFiles);
@@ -370,12 +392,18 @@ async function resolveSeriesPackFile(infoHash, config, seriesImdbId, season, epi
     totalPackSize = allVideoFiles.reduce((sum, f) => sum + (f.bytes || 0), 0);
 
     // 3. Processa file e salva nel DB
+    // Generate torrent title from first video file or hash
+    const firstVideoFile = allVideoFiles[0];
+    const generatedTitle = firstVideoFile ? firstVideoFile.path.split('/')[0] || firstVideoFile.path : `Pack-${infoHash.substring(0, 16)}`;
+
     const processedFiles = await processSeriesPackFiles(
         filesResult.files,
         infoHash,
         seriesImdbId,
         season,
-        dbHelper
+        dbHelper,
+        generatedTitle,  // torrentTitle
+        totalPackSize    // totalPackSize
     );
 
     // 4. Cerca l'episodio richiesto
