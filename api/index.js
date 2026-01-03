@@ -53,7 +53,7 @@ function decodeHtmlEntities(text) {
 }
 
 // ✅ DEBUG MODE
-const DEBUG_MODE = false;
+const DEBUG_MODE = true;
 
 // ✅ Custom Formatter Helper - Full AIOStreams compatible
 // ✅ Custom Formatter Helper - Full AIOStreams compatible
