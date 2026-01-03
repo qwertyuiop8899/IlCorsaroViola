@@ -254,29 +254,33 @@ async function updateRdCacheStatus(cacheResults) {
     for (const result of cacheResults) {
       if (!result.hash) continue;
 
-      // ✅ NEW: Also update file_title if provided (for deduplication)
-      let query;
-      let params;
+      const hashLower = result.hash.toLowerCase();
 
-      if (result.file_title) {
-        // Update cache status AND file_title
-        query = `
-          UPDATE torrents 
-          SET cached_rd = $1, last_cached_check = NOW(), file_title = $3
-          WHERE info_hash = $2 AND (file_title IS NULL OR file_title = '')
-        `;
-        params = [result.cached, result.hash.toLowerCase(), result.file_title];
-      } else {
-        // Only update cache status (no file_title available)
-        query = `
-          UPDATE torrents 
-          SET cached_rd = $1, last_cached_check = NOW()
-          WHERE info_hash = $2
-        `;
-        params = [result.cached, result.hash.toLowerCase()];
-      }
+      // ✅ UPSERT: Insert if not exists, then update cache status
+      // Required NOT NULL columns: info_hash, provider, title, type, upload_date
+      const upsertQuery = `
+        INSERT INTO torrents (
+          info_hash, provider, title, type, upload_date, 
+          cached_rd, last_cached_check, file_title
+        )
+        VALUES ($1, 'rd_cache', $2, 'unknown', NOW(), $3, NOW(), $4)
+        ON CONFLICT (info_hash) DO UPDATE SET
+          cached_rd = EXCLUDED.cached_rd,
+          last_cached_check = NOW(),
+          file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title)
+      `;
 
-      const res = await pool.query(query, params);
+      // Use file_title as fallback title, or generate one from hash
+      const fallbackTitle = result.file_title || `RD-${hashLower.substring(0, 8)}`;
+
+      const params = [
+        hashLower,                           // $1 info_hash
+        fallbackTitle,                       // $2 title  
+        result.cached,                       // $3 cached_rd
+        result.file_title || null            // $4 file_title
+      ];
+
+      const res = await pool.query(upsertQuery, params);
       updated += res.rowCount;
     }
 
@@ -326,6 +330,11 @@ async function getRdCachedAvailability(hashes) {
     });
 
     console.log(`💾 [DB] Found ${result.rows.length}/${hashes.length} hashes with valid RD cache (< 10 days)`);
+
+    // Debug: Show which hashes are cached
+    const cachedTrue = result.rows.filter(r => r.cached_rd === true).length;
+    const cachedFalse = result.rows.filter(r => r.cached_rd === false).length;
+    console.log(`   📊 cached_rd=true: ${cachedTrue}, cached_rd=false: ${cachedFalse}`);
 
     return cachedMap;
 
@@ -399,7 +408,11 @@ async function batchInsertTorrents(torrents) {
             tmdb_id = COALESCE(torrents.tmdb_id, EXCLUDED.tmdb_id),
             size = CASE WHEN torrents.size = 0 OR torrents.size IS NULL THEN EXCLUDED.size ELSE torrents.size END,
             seeders = GREATEST(EXCLUDED.seeders, torrents.seeders),
-            cached_rd = COALESCE(EXCLUDED.cached_rd, torrents.cached_rd),
+            cached_rd = CASE 
+              WHEN torrents.cached_rd = true THEN true  -- Never overwrite true with false
+              WHEN EXCLUDED.cached_rd = true THEN true  -- Allow updating to true
+              ELSE COALESCE(torrents.cached_rd, EXCLUDED.cached_rd)
+            END,
             last_cached_check = CASE 
               WHEN EXCLUDED.last_cached_check IS NOT NULL 
               THEN GREATEST(EXCLUDED.last_cached_check, COALESCE(torrents.last_cached_check, EXCLUDED.last_cached_check))
@@ -937,6 +950,35 @@ async function insertEpisodeFiles(episodeFiles) {
   }
 }
 
+/**
+ * Get all files for a series pack from the DB
+ * @param {string} infoHash - InfoHash of the torrent
+ * @returns {Promise<Array>} Array of cached files
+ */
+async function getSeriesPackFiles(infoHash) {
+  if (!pool) throw new Error('Database not initialized');
+
+  try {
+    const query = `
+            SELECT file_index as id, title as path, size as bytes
+            FROM files 
+            WHERE info_hash = $1
+            ORDER BY file_index ASC
+        `;
+
+    const result = await pool.query(query, [infoHash.toLowerCase()]);
+    return result.rows.map(row => ({
+      id: row.id,
+      path: row.path,
+      bytes: parseInt(row.bytes),
+      selected: 1
+    }));
+  } catch (error) {
+    console.error(`❌ [DB] Error getting series pack files: ${error.message}`);
+    return [];
+  }
+}
+
 module.exports = {
   initDatabase,
   searchByImdbId,
@@ -955,6 +997,7 @@ module.exports = {
   searchPacksByImdbId,
   insertPackFiles,
   getPackFiles,
+  getSeriesPackFiles,
   updatePackAllImdbIds,
   insertEpisodeFiles,
   closeDatabase
