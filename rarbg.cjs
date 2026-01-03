@@ -22,10 +22,10 @@ const https = require("https");
 const RARBG_CONFIG = {
     // Mirror ordinati per priorità (il primo è il primario)
     MIRRORS: [
+        "https://www.proxyrarbg.to",
         "https://rargb.to",
         "https://www2.rarbggo.to",
-        "https://www.rarbgproxy.to",
-        "https://www.proxyrarbg.to"
+        "https://www.rarbgproxy.to"
     ],
 
     // Timeout per le richieste
