@@ -6641,8 +6641,10 @@ async function handleStream(type, id, config, workerOrigin) {
                     }));
 
                 if (torrentsToSave.length > 0) {
-                    const inserted = await dbHelper.batchInsertTorrents(torrentsToSave);
-                    console.log(`💾 [DB] Saved ${inserted}/${torrentsToSave.length} torrents from all sources to DB`);
+                    // 🚀 Fire-and-forget: Save to DB in background without blocking response
+                    dbHelper.batchInsertTorrents(torrentsToSave)
+                        .then(inserted => console.log(`💾 [DB] Saved ${inserted}/${torrentsToSave.length} torrents from all sources to DB (background)`))
+                        .catch(err => console.warn(`⚠️ [DB] Background save failed: ${err.message}`));
                 }
             } catch (dbSaveError) {
                 console.warn(`⚠️ [DB] Failed to save torrents: ${dbSaveError.message}`);
