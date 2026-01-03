@@ -256,22 +256,31 @@ async function updateRdCacheStatus(cacheResults) {
 
       const hashLower = result.hash.toLowerCase();
 
-      // ✅ UPDATE-ONLY: Only update existing rows, skip if not found
-      // This avoids NOT NULL constraint issues from missing columns
-      const updateQuery = `
-        UPDATE torrents 
-        SET cached_rd = $1, last_cached_check = NOW(), 
-            file_title = COALESCE(NULLIF($3, ''), file_title)
-        WHERE info_hash = $2
+      // ✅ UPSERT: Insert if not exists, then update cache status
+      // Required NOT NULL columns: info_hash, provider, title, type, upload_date
+      const upsertQuery = `
+        INSERT INTO torrents (
+          info_hash, provider, title, type, upload_date, 
+          cached_rd, last_cached_check, file_title
+        )
+        VALUES ($1, 'rd_cache', $2, 'unknown', NOW(), $3, NOW(), $4)
+        ON CONFLICT (info_hash) DO UPDATE SET
+          cached_rd = EXCLUDED.cached_rd,
+          last_cached_check = NOW(),
+          file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title)
       `;
 
+      // Use file_title as fallback title, or generate one from hash
+      const fallbackTitle = result.file_title || `RD-${hashLower.substring(0, 8)}`;
+
       const params = [
-        result.cached,
-        hashLower,
-        result.file_title || null
+        hashLower,                           // $1 info_hash
+        fallbackTitle,                       // $2 title  
+        result.cached,                       // $3 cached_rd
+        result.file_title || null            // $4 file_title
       ];
 
-      const res = await pool.query(updateQuery, params);
+      const res = await pool.query(upsertQuery, params);
       updated += res.rowCount;
     }
 
@@ -321,6 +330,11 @@ async function getRdCachedAvailability(hashes) {
     });
 
     console.log(`💾 [DB] Found ${result.rows.length}/${hashes.length} hashes with valid RD cache (< 10 days)`);
+
+    // Debug: Show which hashes are cached
+    const cachedTrue = result.rows.filter(r => r.cached_rd === true).length;
+    const cachedFalse = result.rows.filter(r => r.cached_rd === false).length;
+    console.log(`   📊 cached_rd=true: ${cachedTrue}, cached_rd=false: ${cachedFalse}`);
 
     return cachedMap;
 
