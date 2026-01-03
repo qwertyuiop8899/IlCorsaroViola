@@ -41,13 +41,14 @@ function initDatabase(config = {}) {
  * Search torrents by IMDb ID
  * @param {string} imdbId - IMDb ID (e.g., "tt0111161")
  * @param {string} type - Media type: 'movie' or 'series'
+ * @param {Array<string>} providers - Optional array of provider names to filter by
  * @returns {Promise<Array>} Array of torrent objects
  */
-async function searchByImdbId(imdbId, type = null) {
+async function searchByImdbId(imdbId, type = null, providers = null) {
   if (!pool) throw new Error('Database not initialized');
 
   try {
-    console.log(`💾 [DB] Searching by IMDb: ${imdbId}${type ? ` (${type})` : ''}`);
+    console.log(`💾 [DB] Searching by IMDb: ${imdbId}${type ? ` (${type})` : ''}${providers ? ` [providers: ${providers.join(',')}]` : ''}`);
 
     let query = `
       SELECT 
@@ -69,10 +70,19 @@ async function searchByImdbId(imdbId, type = null) {
     `;
 
     const params = [imdbId, JSON.stringify([imdbId])];
+    let paramIndex = 3;
 
     if (type) {
-      query += ' AND type = $3';
+      query += ` AND type = $${paramIndex}`;
       params.push(type);
+      paramIndex++;
+    }
+
+    // ✅ PROVIDER FILTER: Only return torrents from selected providers
+    if (providers && Array.isArray(providers) && providers.length > 0) {
+      const placeholders = providers.map((_, i) => `$${paramIndex + i}`).join(', ');
+      query += ` AND provider IN (${placeholders})`;
+      params.push(...providers);
     }
 
     query += ' ORDER BY cached_rd DESC NULLS LAST, seeders DESC LIMIT 50';
@@ -91,13 +101,14 @@ async function searchByImdbId(imdbId, type = null) {
  * Search torrents by TMDb ID
  * @param {number} tmdbId - TMDb ID (e.g., 550)
  * @param {string} type - Media type: 'movie' or 'series'
+ * @param {Array<string>} providers - Optional array of provider names to filter by
  * @returns {Promise<Array>} Array of torrent objects
  */
-async function searchByTmdbId(tmdbId, type = null) {
+async function searchByTmdbId(tmdbId, type = null, providers = null) {
   if (!pool) throw new Error('Database not initialized');
 
   try {
-    console.log(`💾 [DB] Searching by TMDb: ${tmdbId}${type ? ` (${type})` : ''}`);
+    console.log(`💾 [DB] Searching by TMDb: ${tmdbId}${type ? ` (${type})` : ''}${providers ? ` [providers: ${providers.join(',')}]` : ''}`);
 
     let query = `
       SELECT 
@@ -119,10 +130,19 @@ async function searchByTmdbId(tmdbId, type = null) {
     `;
 
     const params = [tmdbId];
+    let paramIndex = 2;
 
     if (type) {
-      query += ' AND type = $2';
+      query += ` AND type = $${paramIndex}`;
       params.push(type);
+      paramIndex++;
+    }
+
+    // ✅ PROVIDER FILTER: Only return torrents from selected providers
+    if (providers && Array.isArray(providers) && providers.length > 0) {
+      const placeholders = providers.map((_, i) => `$${paramIndex + i}`).join(', ');
+      query += ` AND provider IN (${placeholders})`;
+      params.push(...providers);
     }
 
     query += ' ORDER BY cached_rd DESC NULLS LAST, seeders DESC LIMIT 50';
@@ -142,15 +162,16 @@ async function searchByTmdbId(tmdbId, type = null) {
  * @param {string} imdbId - IMDb ID of the series
  * @param {number} season - Season number
  * @param {number} episode - Episode number
+ * @param {Array<string>} providers - Optional array of provider names to filter by
  * @returns {Promise<Array>} Array of file objects with torrent info
  */
-async function searchEpisodeFiles(imdbId, season, episode) {
+async function searchEpisodeFiles(imdbId, season, episode, providers = null) {
   if (!pool) throw new Error('Database not initialized');
 
   try {
-    console.log(`💾 [DB] Searching episode: ${imdbId} S${season}E${episode}`);
+    console.log(`💾 [DB] Searching episode: ${imdbId} S${season}E${episode}${providers ? ` [providers: ${providers.join(',')}]` : ''}`);
 
-    const query = `
+    let query = `
       SELECT 
         f.file_index,
         f.title as file_title,
@@ -169,11 +190,23 @@ async function searchEpisodeFiles(imdbId, season, episode) {
       WHERE f.imdb_id = $1 
         AND f.imdb_season = $2 
         AND f.imdb_episode = $3
+    `;
+
+    const params = [imdbId, season, episode];
+
+    // ✅ PROVIDER FILTER: Only return torrents from selected providers
+    if (providers && Array.isArray(providers) && providers.length > 0) {
+      const placeholders = providers.map((_, i) => `$${4 + i}`).join(', ');
+      query += ` AND t.provider IN (${placeholders})`;
+      params.push(...providers);
+    }
+
+    query += `
       ORDER BY t.cached_rd DESC NULLS LAST, t.seeders DESC
       LIMIT 50
     `;
 
-    const result = await pool.query(query, [imdbId, season, episode]);
+    const result = await pool.query(query, params);
     console.log(`💾 [DB] Found ${result.rows.length} files for S${season}E${episode}`);
 
     return result.rows;
