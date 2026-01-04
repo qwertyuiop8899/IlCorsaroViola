@@ -6697,6 +6697,32 @@ async function handleStream(type, id, config, workerOrigin) {
         // ✅ Apply exact matching filters
         let filteredResults = results;
 
+        // ✅ FULL ITA MODE: Only show results with "ITA" in title (except CorsaroNero and Torrentio which are already ITA-focused)
+        if (config.full_ita) {
+            const exemptProviders = ['corsaro', 'ilcorsaronero', 'corsaronero', 'torrentio'];
+            const beforeCount = filteredResults.length;
+
+            filteredResults = filteredResults.filter(result => {
+                const provider = (result.source || result.externalAddon || '').toLowerCase();
+
+                // Exempt providers: CorsaroNero and Torrentio
+                const isExempt = exemptProviders.some(exempt => provider.includes(exempt));
+                if (isExempt) return true;
+
+                // For all other providers, check for strict ITA in title
+                const title = (result.title || result.websiteTitle || '').toLowerCase();
+                const hasIta = /\bita\b|italian|italiano/i.test(title);
+
+                if (!hasIta) {
+                    console.log(`🇮🇹 [FULL ITA] Filtered out: "${(result.title || '').substring(0, 50)}..." (${provider})`);
+                }
+
+                return hasIta;
+            });
+
+            console.log(`🇮🇹 [FULL ITA] Filtered ${beforeCount} → ${filteredResults.length} results (strict ITA mode)`);
+        }
+
         if (type === 'series') {
             const originalCount = filteredResults.length;
             const displayEpisode = kitsuId && mediaDetails.absoluteEpisode
