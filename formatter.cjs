@@ -458,7 +458,7 @@ const PRESET_TEMPLATES = {
 {stream.filename::exists["📄 ❯ {stream.filename}"||""]}`
     },
     dav: {
-        name: `{stream.resolution::exists["{stream.resolution::replace('2160p', '🎥4K UHD')::replace('1440p','🎬 QHD')::replace('1080p','📀 FHD')::replace('720p','💿 HD')::replace('576p','💩 Low Quality')::replace('480p','💩 Low Quality')::replace('360p','💩 Low Quality')::replace('240p','💩 Low Quality')::replace('144p','💩 Low Quality')}"||"❓ Unknown"]}`,
+        name: `{stream.resolution::=2160p["🎥4K UHD"]||""}{stream.resolution::=1440p["🎬 QHD"]||""}{stream.resolution::=1080p["📀 FHD"]||""}{stream.resolution::=720p["💿 HD"]||""}{stream.resolution::=480p["💩 SD"]||""}{stream.resolution::exists[""||"❓ Unknown"]}`,
         description: `{stream.regexMatched::exists["🎚️ {stream.regexMatched}
 "||""]}{stream.quality::exists["🎥 {stream.quality} "||""]}{stream.visualTags::exists["📺 {stream.visualTags::join(' | ')} "||""]}{stream.encode::exists["🎞️ {stream.encode}"||""]}
 {stream.audioTags::exists["🎧 {stream.audioTags::join(' | ')} "||""]}{stream.audioChannels::exists["🔊 {stream.audioChannels::join(' | ')}"||""]}
