@@ -7071,7 +7071,7 @@ async function handleStream(type, id, config, workerOrigin) {
                             }));
 
                         if (userCacheToSave.length > 0) {
-                            await dbHelper.updateRdCacheStatus(userCacheToSave);
+                            await dbHelper.updateRdCacheStatus(userCacheToSave, type);
                             console.log(`💾 [GLOBAL CACHE] Saved ${userCacheToSave.length} RD personal torrents to DB (now available for all users)`);
                         }
                     }
@@ -7143,7 +7143,7 @@ async function handleStream(type, id, config, workerOrigin) {
                                         }).filter(Boolean);
 
                                         if (liveResultsToSave.length > 0 && dbEnabled) {
-                                            await dbHelper.updateRdCacheStatus(liveResultsToSave);
+                                            await dbHelper.updateRdCacheStatus(liveResultsToSave, type);
                                             console.log(`💾 [DB] Saved ${liveResultsToSave.length} background live check results`);
                                         }
                                     })
@@ -7178,7 +7178,7 @@ async function handleStream(type, id, config, workerOrigin) {
                                         file_title: data.file_title || ''
                                     }));
                                     if (toSave.length > 0 && dbEnabled) {
-                                        await dbHelper.updateRdCacheStatus(toSave);
+                                        await dbHelper.updateRdCacheStatus(toSave, type);
                                         console.log(`✅ [File Title] Enriched ${toSave.length} items (one-time)`);
                                     }
                                 })
@@ -9628,7 +9628,7 @@ export default async function handler(req, res) {
                         // ✅ CACHE SUCCESS: Mark torrent as cached in DB (5-day TTL)
                         if (dbEnabled && infoHash) {
                             try {
-                                await dbHelper.updateRdCacheStatus([{ hash: infoHash, cached: true }]);
+                                await dbHelper.updateRdCacheStatus([{ hash: infoHash, cached: true }], type);
                                 console.log(`💾 [DB] Marked ${infoHash} as RD cached (5-day TTL)`);
                             } catch (dbErr) {
                                 console.warn(`⚠️ Failed to update DB cache status: ${dbErr.message}`);
