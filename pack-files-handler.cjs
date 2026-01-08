@@ -180,13 +180,22 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
             if (cacheData && typeof cacheData === 'object') {
                 const hashKey = Object.keys(cacheData).find(k => k.toLowerCase() === infoHash.toLowerCase());
                 if (hashKey && cacheData[hashKey]?.files && cacheData[hashKey].files.length > 0) {
-                    const files = cacheData[hashKey].files.map((f, idx) => ({
-                        id: idx,  // FIXED: Use array index, NOT Torbox's internal f.id - Stremio expects array position
+                    // CRITICAL: Sort files by path BEFORE assigning index!
+                    // Torbox API returns files in random order, but torrent file list is typically alphabetical
+                    // Stremio P2P uses torrent's original order, so we must sort to match
+                    const sortedFiles = [...cacheData[hashKey].files].sort((a, b) => {
+                        const pathA = (a.name || a.path || '').toLowerCase();
+                        const pathB = (b.name || b.path || '').toLowerCase();
+                        return pathA.localeCompare(pathB);
+                    });
+
+                    const files = sortedFiles.map((f, idx) => ({
+                        id: idx,  // Index AFTER sorting - matches torrent file order
                         path: f.name || f.path || `file_${idx}`,
                         bytes: f.size || 0,
                         selected: 1
                     }));
-                    console.log(`📊 [PACK-HANDLER] Torbox cache file indices: ${files.map(f => f.id).join(', ')}`);
+                    console.log(`📊 [PACK-HANDLER] Torbox cache files (sorted by path): ${files.map(f => `${f.id}:${f.path.substring(0, 30)}`).join(', ')}`);
                     console.log(`✅ [PACK-HANDLER] Got ${files.length} files from Torbox CACHE (fast path)`);
                     return { torrentId: 'cached', files };
                 }
@@ -227,13 +236,21 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
             throw new Error('No files in Torbox torrent info');
         }
 
-        const files = torrent.files.map((f, idx) => ({
-            id: idx,  // FIXED: Use array index, NOT Torbox's internal f.id - Stremio expects array position
+        // CRITICAL: Sort files by path BEFORE assigning index!
+        // Torbox API may return files in random order, but torrent file list is typically alphabetical
+        const sortedFiles = [...torrent.files].sort((a, b) => {
+            const pathA = (a.name || '').toLowerCase();
+            const pathB = (b.name || '').toLowerCase();
+            return pathA.localeCompare(pathB);
+        });
+
+        const files = sortedFiles.map((f, idx) => ({
+            id: idx,  // Index AFTER sorting - matches torrent file order
             path: f.name,
             bytes: f.size,
             selected: 1
         }));
-        console.log(`📊 [PACK-HANDLER] Torbox slow path file indices: ${files.map(f => f.id).join(', ')}`);
+        console.log(`📊 [PACK-HANDLER] Torbox slow path files (sorted): ${files.map(f => `${f.id}:${f.path.substring(0, 30)}`).join(', ')}`);
 
         console.log(`🗑️ [PACK-HANDLER] Deleting temporary Torbox torrent ${torrentId}`);
         await axios.get(`${baseUrl}/torrents/controltorrent`, {
