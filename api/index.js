@@ -6736,7 +6736,9 @@ async function handleStream(type, id, config, workerOrigin) {
                         imdb_id: mediaDetails.imdbId || null,  // snake_case for DB
                         tmdb_id: mediaDetails.tmdbId || null,  // snake_case for DB
                         upload_date: new Date().toISOString().split('T')[0],  // YYYY-MM-DD format
-                        cached_rd: r.cached || false // Save cached status if available
+                        cached_rd: r.cached || false, // Save cached status if available
+                        file_index: r.fileIndex,
+                        file_title: r.file_title || null
                     }));
 
                 if (torrentsToSave.length > 0) {
