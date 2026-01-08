@@ -6334,7 +6334,10 @@ async function handleStream(type, id, config, workerOrigin) {
                     filename: fileName || torrentTitle,
                     source: `💾 ${dbResult.provider || 'Database'}`,
                     fileIndex: dbResult.file_index !== null && dbResult.file_index !== undefined ? dbResult.file_index : undefined, // For series episodes and pack movies
-                    file_title: fileName || undefined // Real filename from DB (only for specific episode)
+                    file_title: fileName || undefined, // Real filename from DB (only for specific episode)
+                    // ✅ FIX: Include IMDb IDs for filter trust logic
+                    imdb_id: dbResult.imdb_id || null,
+                    all_imdb_ids: dbResult.all_imdb_ids || null
                 });
 
                 // DEBUG: Log file info from DB
@@ -6684,6 +6687,11 @@ async function handleStream(type, id, config, workerOrigin) {
                         result.fileIndex = existing.fileIndex;
                         if (DEBUG_MODE) console.log(`🔄 [Dedup] Preserved file_title: ${existing.file_title}`);
                     }
+                    // ✅ FIX: Preserve mainFileSize if new doesn't have it but existing does
+                    if (!result.mainFileSize && existing.mainFileSize) {
+                        result.mainFileSize = existing.mainFileSize;
+                        if (DEBUG_MODE) console.log(`🔄 [Dedup] Preserved mainFileSize: ${existing.mainFileSize}`);
+                    }
                     bestResults.set(hash, result);
                 } else {
                     if (DEBUG_MODE) console.log(`⏭️  [Dedup] SKIP hash ${hash.substring(0, 8)}...: "${result.title}" (keeping "${existing.title}")`);
@@ -6693,6 +6701,12 @@ async function handleStream(type, id, config, workerOrigin) {
                         existing.fileIndex = result.fileIndex;
                         bestResults.set(hash, existing); // Update map with modified object
                         if (DEBUG_MODE) console.log(`⏭️  [Dedup] Added file_title from skipped: ${result.file_title}`);
+                    }
+                    // ✅ FIX: Copy mainFileSize from new if existing doesn't have it
+                    if (!existing.mainFileSize && result.mainFileSize) {
+                        existing.mainFileSize = result.mainFileSize;
+                        bestResults.set(hash, existing);
+                        if (DEBUG_MODE) console.log(`⏭️  [Dedup] Added mainFileSize from skipped: ${result.mainFileSize}`);
                     }
                 }
             }
