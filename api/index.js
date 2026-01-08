@@ -6309,11 +6309,11 @@ async function handleStream(type, id, config, workerOrigin) {
                 // Handle different result formats: searchEpisodeFiles uses torrent_title, others use title
                 const torrentTitle = dbResult.torrent_title || dbResult.title;
                 const torrentSize = dbResult.torrent_size || dbResult.size;
-                // ✅ Use file_size (single episode) if available, otherwise fallback to torrent_size (pack)
+                // ✅ Use file_size (single episode/movie from pack) if available, otherwise fallback to torrent_size (pack)
                 const displaySize = dbResult.file_size || torrentSize;
-                // Only use file_title if it came from searchEpisodeFiles (has torrent_title field)
-                // This ensures we only show the actual filename for the SPECIFIC episode
-                const fileName = dbResult.torrent_title ? dbResult.file_title : undefined;
+                // Use file_title from episodes OR file_path from pack_files for movies
+                // searchEpisodeFiles has torrent_title, searchPacksByImdbId has file_path
+                const fileName = dbResult.file_title || dbResult.file_path || (dbResult.torrent_title ? undefined : null);
 
                 // Build magnet link
                 const magnetLink = `magnet:?xt=urn:btih:${dbResult.info_hash}&dn=${encodeURIComponent(torrentTitle)}`;
