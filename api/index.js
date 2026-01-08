@@ -5286,7 +5286,11 @@ async function handleStream(type, id, config, workerOrigin) {
                     );
 
                     // 🔥 ALSO search for season packs and complete packs (they don't have file_index)
-                    const packResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders);
+                    const packResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders, {
+                        title: mediaDetails.title,
+                        year: mediaDetails.year,
+                        fullIta: config.full_ita
+                    });
                     console.log(`💾 [DB] Found ${packResults.length} additional torrents (packs/complete series)`);
 
                     // Merge: episode files + packs
@@ -5294,7 +5298,11 @@ async function handleStream(type, id, config, workerOrigin) {
                 } else {
                     // No season/episode available (Kitsu without TMDb conversion fallback)
                     console.log(`🎌 [Anime] No season mapping available, fetching all packs`);
-                    dbResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders);
+                    dbResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders, {
+                        title: mediaDetails.title,
+                        year: mediaDetails.year,
+                        fullIta: config.full_ita
+                    });
                 }
             } else {
                 // Search for movie - both singles AND packs
@@ -5305,7 +5313,11 @@ async function handleStream(type, id, config, workerOrigin) {
                 }
 
                 // PRIORITY 2: Search regular torrents (single movies or packs via all_imdb_ids)
-                const regularResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders);
+                const regularResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders, {
+                    title: mediaDetails.title,
+                    year: mediaDetails.year,
+                    fullIta: config.full_ita
+                });
 
                 // Merge: packs first (with file_index), then regular
                 dbResults = [...(packResults || []), ...regularResults];
