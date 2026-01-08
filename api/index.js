@@ -6007,7 +6007,12 @@ async function handleStream(type, id, config, workerOrigin) {
                     if (result.status === 'fulfilled' && result.value) {
                         console.log(`✅ ${sourceName} returned ${result.value.length} results for query.`);
                         if (rawResultsByProvider[sourceName]) {
-                            rawResultsByProvider[sourceName].push(...result.value);
+                            // ✅ Fix: Map external addon filename to file_title to preserve specific file selection
+                            const mappedResults = result.value.map(r => ({
+                                ...r,
+                                file_title: r.filename || r.title // External addons return specific filename in .filename or .title
+                            }));
+                            rawResultsByProvider[sourceName].push(...mappedResults);
                         }
 
                         // 🛑 Track results from Italian title queries for early exit
@@ -7301,11 +7306,13 @@ async function handleStream(type, id, config, workerOrigin) {
                     // For series, resolveSeriesPackFile already set the correct episode file_title
                     // Cache returns the largest file which is wrong for series packs
                     if (type === 'movie') {
+                        // FIX: Only use cached file_title if we don't already have a valid one (e.g. from Torrentio behaviorHints)
+                        // This prevents specialized pack files (like "Basil l'investigatopo") being overwritten by generic cache title ("Oceania")
                         if (!result.file_title && rdCacheData?.file_title) {
                             result.file_title = rdCacheData.file_title;
                             console.log(`📄 [RD] Using cached file_title (movie): ${result.file_title.substring(0, 40)}...`);
                         } else if (result.file_title) {
-                            console.log(`📄 [RD] Using DB file_title (movie): ${result.file_title.substring(0, 40)}...`);
+                            console.log(`📄 [RD] Preserving existing file_title (movie): ${result.file_title.substring(0, 40)}...`);
                         }
                     }
 
