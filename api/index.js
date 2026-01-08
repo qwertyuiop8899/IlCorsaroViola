@@ -340,7 +340,8 @@ function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', is
                 // ✅ Use numeric bytes, not formatted strings like "10.5 GB"
                 size: (function () {
                     // Try numeric fields first
-                    const numericSize = result.sizeInBytes || result.mainFileSize || result.matchedFileSize || result.file_size;
+                    // Try numeric fields first (Prioritize specific file size!)
+                    const numericSize = result.mainFileSize || result.file_size || result.matchedFileSize || result.sizeInBytes;
                     if (typeof numericSize === 'number' && numericSize > 0) return numericSize;
 
                     // Try to parse string fields
@@ -6947,6 +6948,13 @@ async function handleStream(type, id, config, workerOrigin) {
             }
             filteredResults = filteredResults.filter(result => {
                 const torrentTitle = result.title || result.websiteTitle;
+
+                // 🎯 TRUST DB MATCHES (If result comes from DB and has matching IMDb ID, keep it!)
+                // This fixes DB-only mode hiding valid packs like "Filmografia..."
+                if (result.imdb_id === mediaDetails.imdbId) {
+                    console.log(`🎬 [Filter] Trusting DB match for: ${torrentTitle.substring(0, 40)}... (ID match)`);
+                    return true;
+                }
 
                 // 🎯 SKIP YEAR FILTERING FOR PACKS (they contain multiple movies with different years)
                 // Packs are identified by having a fileIndex (from pack_files table)
