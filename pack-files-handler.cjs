@@ -222,7 +222,7 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
                     });
 
                     console.log(`🔍 [PACK-DEBUG] Filtered to ${sortedFiles.length} VALID VIDEO files (no samples), sorted:`);
-                    sortedFiles.forEach((f, i) => console.log(`   [${i}] ${f.name} (${f.size})`));
+                    sortedFiles.forEach((f, i) => console.log(`   [${i}] ${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`));
 
                     const files = sortedFiles.map((f, idx) => ({
                         id: idx,  // Index AFTER filtering+sorting - matches Stremio/MediaFusion
@@ -306,7 +306,7 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
         });
 
         console.log(`🔍 [PACK-DEBUG] Filtered to ${sortedFiles.length} VALID VIDEO files (no samples), sorted:`);
-        sortedFiles.forEach((f, i) => console.log(`   [${i}] ${f.name} (${f.size})`));
+        sortedFiles.forEach((f, i) => console.log(`   [${i}] ${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`));
 
         const files = sortedFiles.map((f, idx) => ({
             id: idx,  // Index AFTER filtering+sorting - matches Stremio/MediaFusion
@@ -430,7 +430,10 @@ async function resolveSeriesPackFile(infoHash, config, seriesImdbId, season, epi
 
     // 1️⃣ CHECK DB CACHE for Index (Fastest, FREE)
     // Check if we already have the file structure for this pack in local DB
-    if (dbHelper && typeof dbHelper.getSeriesPackFiles === 'function') {
+    // 🔥 DEBUG: Skip DB for Stranger Things hash to force re-index with new filters
+    if (infoHash.toLowerCase().startsWith('74a22624')) {
+        console.log(`🔧 [DEBUG] Skipping DB Cache for Stranger Things... forcing clean re-index`);
+    } else if (dbHelper && typeof dbHelper.getSeriesPackFiles === 'function') {
         try {
             const cachedFiles = await dbHelper.getSeriesPackFiles(infoHash);
             if (cachedFiles && cachedFiles.length > 0) {
