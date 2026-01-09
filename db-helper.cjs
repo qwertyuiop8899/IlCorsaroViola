@@ -38,23 +38,20 @@ function initDatabase(config = {}) {
 }
 
 /**
- * Search torrents by IMDb ID with optional full-text search fallback
+ * Search torrents by IMDb ID
  * @param {string} imdbId - IMDb ID (e.g., "tt0111161")
  * @param {string} type - Media type: 'movie' or 'series'
  * @param {Array<string>} providers - Optional array of provider names to filter by
- * @param {Object} options - Optional: { title, year, fullIta } for FTS fallback
  * @returns {Promise<Array>} Array of torrent objects
  */
-async function searchByImdbId(imdbId, type = null, providers = null, options = {}) {
+async function searchByImdbId(imdbId, type = null, providers = null) {
   if (!pool) throw new Error('Database not initialized');
 
-  const { title, year, fullIta } = options;
-
   try {
-    console.log(`💾 [DB] Searching by IMDb: ${imdbId}${type ? ` (${type})` : ''}${providers ? ` [providers: ${providers.join(',')}]` : ''}${title ? ` [FTS: ${title} ${year || ''}]` : ''}`);
+    console.log(`💾 [DB] Searching by IMDb: ${imdbId}${type ? ` (${type})` : ''}${providers ? ` [providers: ${providers.join(',')}]` : ''}`);
 
-    // Build common SELECT columns
-    const selectColumns = `
+    let query = `
+      SELECT 
         info_hash, 
         provider, 
         title, 
@@ -67,63 +64,31 @@ async function searchByImdbId(imdbId, type = null, providers = null, options = {
         cached_rd,
         last_cached_check,
         file_index,
-        file_title`;
-
-    // Build type condition
-    let typeCondition = '';
-    if (type) {
-      typeCondition = ` AND (type = '${type}' OR type = 'unknown')`;
-    }
-
-    // Build provider condition
-    let providerCondition = '';
-    if (providers && Array.isArray(providers) && providers.length > 0) {
-      const providerPatterns = providers.map(p => `provider ILIKE '%${p.replace(/'/g, "''")}%'`).join(' OR ');
-      providerCondition = ` AND (${providerPatterns})`;
-    }
-
-    // Main query: search by IMDb ID
-    let query = `
-      SELECT ${selectColumns}
+        file_title
       FROM torrents 
-      WHERE (imdb_id = $1 OR all_imdb_ids @> $2::jsonb)
-      ${typeCondition}
-      ${providerCondition}
+      WHERE (imdb_id = $1 OR all_imdb_ids @> $2)
     `;
 
     const params = [imdbId, JSON.stringify([imdbId])];
+    let paramIndex = 3;
 
-    // ✅ FTS FALLBACK: If title provided, add UNION with full-text search
-    // This catches torrents saved with wrong IMDb ID but matching title+year
-    if (title && title.trim()) {
-      // Clean title for FTS (remove special chars)
-      const cleanTitle = title.replace(/[^\w\s]/g, ' ').trim().toLowerCase();
-
-      // Build FTS query terms: title + year + optional 'ita'
-      let ftsTerms = cleanTitle;
-      if (year) ftsTerms += ` ${year}`;
-      if (fullIta) ftsTerms += ' ita';
-
-      query += `
-      UNION
-      SELECT ${selectColumns}
-      FROM torrents 
-      WHERE title_vector @@ plainto_tsquery('simple', $3)
-        AND imdb_id != $1
-      ${typeCondition}
-      ${providerCondition}
-      `;
-
-      params.push(ftsTerms);
-      console.log(`🔍 [FTS Fallback] Searching: "${ftsTerms}"`);
+    // ✅ FIX: Include 'unknown' type to catch RD cache torrents that don't have type set
+    if (type) {
+      query += ` AND (type = $${paramIndex} OR type = 'unknown')`;
+      params.push(type);
+      paramIndex++;
     }
 
-    // Wrap in subquery for proper ORDER BY with UNION
-    if (title && title.trim()) {
-      query = `SELECT * FROM (${query}) AS combined ORDER BY cached_rd DESC NULLS LAST, seeders DESC LIMIT 50`;
-    } else {
-      query += ' ORDER BY cached_rd DESC NULLS LAST, seeders DESC LIMIT 50';
+    // ✅ PROVIDER FILTER: Only return torrents from selected providers
+    // Use ILIKE patterns for case-insensitive matching and variants (e.g., 'Knaben (1337x)')
+    if (providers && Array.isArray(providers) && providers.length > 0) {
+      const patterns = providers.map((p, i) => `provider ILIKE $${paramIndex + i}`).join(' OR ');
+      query += ` AND (${patterns})`;
+      // Add % wildcards for partial matching (e.g., 'knaben' matches 'Knaben (1337x)')
+      params.push(...providers.map(p => `%${p}%`));
     }
+
+    query += ' ORDER BY cached_rd DESC NULLS LAST, seeders DESC LIMIT 50';
 
     const result = await pool.query(query, params);
     console.log(`💾 [DB] Found ${result.rows.length} torrents for IMDb ${imdbId}`);
@@ -480,11 +445,11 @@ async function batchInsertTorrents(torrents) {
     for (const torrent of torrents) {
       try {
         const query = `
-INSERT INTO torrents (
+          INSERT INTO torrents (
             info_hash, provider, title, size, type, upload_date, 
-            seeders, imdb_id, tmdb_id, cached_rd, last_cached_check, file_index, file_title
+            seeders, imdb_id, tmdb_id, cached_rd, last_cached_check, file_index
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           ON CONFLICT (info_hash) DO UPDATE SET
             imdb_id = COALESCE(torrents.imdb_id, EXCLUDED.imdb_id),
             tmdb_id = COALESCE(torrents.tmdb_id, EXCLUDED.tmdb_id),
@@ -500,33 +465,7 @@ INSERT INTO torrents (
               THEN GREATEST(EXCLUDED.last_cached_check, COALESCE(torrents.last_cached_check, EXCLUDED.last_cached_check))
               ELSE torrents.last_cached_check
             END,
-            file_index = COALESCE(EXCLUDED.file_index, torrents.file_index),
-            file_title = COALESCE(EXCLUDED.file_title, torrents.file_title),
-            -- ✅ FIX: Accumulate IMDb IDs for pack torrents
-            all_imdb_ids = CASE
-              WHEN EXCLUDED.imdb_id IS NOT NULL 
-                   AND EXCLUDED.imdb_id != COALESCE(torrents.imdb_id, '')
-                   AND NOT (COALESCE(torrents.all_imdb_ids, '[]'::jsonb) @> to_jsonb(EXCLUDED.imdb_id::text))
-                   -- 🛡️ PROTECTION: Only accumulate IDs for movies (packs) or Explicit Series Collections
-                   -- Prevents spin-offs (like House of Ashur) from being linked to parent series
-                   AND (
-                     torrents.type = 'movie' 
-                     OR (
-                       torrents.type = 'series' 
-                       AND (
-                         torrents.title ILIKE '%collection%' 
-                         OR torrents.title ILIKE '%complete%' 
-                         OR torrents.title ILIKE '%pack%' 
-                         OR torrents.title ILIKE '%anthology%'
-                         OR torrents.title ILIKE '%tutta la serie%'
-                         OR torrents.title ILIKE '%stagion%' -- Matches Stagione/Stagioni (seasons packs)
-                         OR torrents.title ILIKE '%season%' -- Matches Season/Seasons packs
-                       )
-                     )
-                   )
-              THEN COALESCE(torrents.all_imdb_ids, '[]'::jsonb) || to_jsonb(EXCLUDED.imdb_id::text)
-              ELSE COALESCE(torrents.all_imdb_ids, '[]'::jsonb)
-            END
+            file_index = COALESCE(EXCLUDED.file_index, torrents.file_index)
         `;
 
         const values = [
@@ -541,8 +480,7 @@ INSERT INTO torrents (
           torrent.tmdb_id,
           torrent.cached_rd,
           torrent.last_cached_check,
-          torrent.file_index,
-          torrent.file_title || null // $13
+          torrent.file_index
         ];
 
         const res = await pool.query(query, values);
@@ -585,18 +523,6 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo 
     if (episodeInfo && episodeInfo.imdbId && episodeInfo.season && episodeInfo.episode) {
       console.log(`💾 [DB] Saving episode file: ${episodeInfo.imdbId} S${episodeInfo.season}E${episodeInfo.episode}`);
 
-      // ✅ FIX: Ensure we use the main torrent's IMDb ID if available, 
-      // to prevent search context contamination (e.g. House of Ashur showing up in Spartacus search)
-      // This fetch is moved up so it applies to both UPDATE and INSERT operations
-      const torrentCheck = await pool.query('SELECT imdb_id FROM torrents WHERE info_hash = $1', [infoHash.toLowerCase()]);
-      let finalImdbId = episodeInfo.imdbId;
-      if (torrentCheck.rows.length > 0 && torrentCheck.rows[0].imdb_id) {
-        finalImdbId = torrentCheck.rows[0].imdb_id;
-        if (finalImdbId !== episodeInfo.imdbId) {
-          console.log(`🛡️ [DB] Using parent torrent IMDbID ${finalImdbId} instead of context ID ${episodeInfo.imdbId} for file ${fileName}`);
-        }
-      }
-
       // Check if file already exists
       const checkQuery = `
         SELECT file_index FROM files 
@@ -607,31 +533,27 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo 
       `;
       const checkRes = await pool.query(checkQuery, [
         infoHash.toLowerCase(),
-        finalImdbId, // Use the correct ID for checking existence too? No, checks usually use the *target* ID.
-        // But if we are correcting it, maybe we should check based on hash+fileIndex?
-        // Actually logic below uses hash+fileIndex only for conflict check. 
-        // This specific checkQuery checks if THIS episode already has THIS file associated.
+        episodeInfo.imdbId,
         episodeInfo.season,
         episodeInfo.episode
       ]);
 
       if (checkRes.rowCount > 0) {
-        // Record already exists for this episode - just update the title/index if needed
-        // And importantly verify/update the IMDb ID if it matches our 'finalImdbId' (safe).
+        // Record already exists for this episode - just update the title if needed
         const updateQuery = `
           UPDATE files
           SET file_index = $1,
-              title = $2,
-              imdb_id = $3
-          WHERE info_hash = $4 
+              title = $2
+          WHERE info_hash = $3 
+            AND imdb_id = $4 
             AND imdb_season = $5 
             AND imdb_episode = $6
         `;
         const res = await pool.query(updateQuery, [
           fileIndex,
           fileName,
-          finalImdbId,
           infoHash.toLowerCase(),
+          episodeInfo.imdbId,
           episodeInfo.season,
           episodeInfo.episode
         ]);
@@ -665,7 +587,7 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo 
           infoHash.toLowerCase(),
           fileIndex,
           fileName,
-          finalImdbId,
+          episodeInfo.imdbId,
           episodeInfo.season,
           episodeInfo.episode
         ]);
