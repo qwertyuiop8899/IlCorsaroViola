@@ -512,11 +512,11 @@ async function batchInsertTorrents(torrents) {
  * @param {Object} episodeInfo - Optional: {imdbId, season, episode} for series
  * @returns {Promise<boolean>} Success status
  */
-async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo = null) {
+async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = null, episodeInfo = null) {
   if (!pool) throw new Error('Database not initialized');
 
   try {
-    console.log(`💾 [DB updateTorrentFileInfo] Input: hash=${infoHash}, fileIndex=${fileIndex}, filePath=${filePath}, episodeInfo=`, episodeInfo);
+    console.log(`💾 [DB updateTorrentFileInfo] Input: hash=${infoHash}, fileIndex=${fileIndex}, size=${fileSize}, filePath=${filePath}, episodeInfo=`, episodeInfo);
 
     // Extract just the filename from path
     const fileName = filePath.split('/').pop().split('\\').pop();
@@ -542,11 +542,12 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo 
       ]);
 
       if (checkRes.rowCount > 0) {
-        // Record already exists for this episode - just update the title if needed
+        // Record already exists for this episode - just update the title and size if needed
         const updateQuery = `
           UPDATE files
           SET file_index = $1,
-              title = $2
+              title = $2,
+              size = COALESCE($7, size)
           WHERE info_hash = $3 
             AND imdb_id = $4 
             AND imdb_season = $5 
@@ -558,7 +559,8 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo 
           infoHash.toLowerCase(),
           episodeInfo.imdbId,
           episodeInfo.season,
-          episodeInfo.episode
+          episodeInfo.episode,
+          fileSize // $7
         ]);
         console.log(`✅ [DB] Updated file in 'files' table: ${fileName} (rowCount=${res.rowCount})`);
         return res.rowCount > 0;
@@ -578,13 +580,14 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo 
 
         // Insert new file (UPSERT - update if exists)
         const insertQuery = `
-          INSERT INTO files (info_hash, file_index, title, imdb_id, imdb_season, imdb_episode)
-          VALUES ($1, $2, $3, $4, $5, $6)
+          INSERT INTO files (info_hash, file_index, title, imdb_id, imdb_season, imdb_episode, size)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
           ON CONFLICT (info_hash, file_index) DO UPDATE SET
             title = EXCLUDED.title,
             imdb_id = EXCLUDED.imdb_id,
             imdb_season = EXCLUDED.imdb_season,
-            imdb_episode = EXCLUDED.imdb_episode
+            imdb_episode = EXCLUDED.imdb_episode,
+            size = EXCLUDED.size
         `;
         const res = await pool.query(insertQuery, [
           infoHash.toLowerCase(),
@@ -592,7 +595,8 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo 
           fileName,
           episodeInfo.imdbId,
           episodeInfo.season,
-          episodeInfo.episode
+          episodeInfo.episode,
+          fileSize // $7
         ]);
 
         console.log(`✅ [DB] Upserted file into 'files' table: ${fileName}`);
