@@ -6900,6 +6900,8 @@ async function handleStream(type, id, config, workerOrigin) {
 
                 // ✅ REFACTORED VERIFICATION: Check DB Cache for ALL packs first!
                 const needsExternalVerification = [];
+                const newlyVerified = [];
+                const excluded = [];
 
                 // 1️⃣ FAST PATH: Check DB Cache for ALL unverified packs
                 console.log(`📦 [SCRAPE VERIFY] Checking DB cache for ${unverifiedPacks.length} packs...`);
