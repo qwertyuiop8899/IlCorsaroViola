@@ -654,7 +654,7 @@ function findMovieFile(files, targetTitle, targetYear) {
     return bestMatch;
 }
 
-}
+
 
 module.exports = {
     resolveSeriesPackFile,
