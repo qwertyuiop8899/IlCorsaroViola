@@ -6301,10 +6301,10 @@ async function handleStream(type, id, config, workerOrigin) {
                             excluded.push(dbResult);
                         }
                     } catch (err) {
-                        console.warn(`⚠️ [PACK VERIFY] External error: ${err.message} - keeping pack`);
-                        // Adding to verified to be safe on error? No, safer to exclude if we can't verify.
-                        // But original logic kept it. Let's keep it to avoid false negatives on network error.
-                        newlyVerified.push(dbResult);
+                        console.warn(`⚠️ [PACK VERIFY] External error: ${err.message} - EXCLUDING pack to be safe`);
+                        // 🔥 STRICT MODE: If we can't verify it, we can't assume it has the episode.
+                        // User requested: "if you can't see the file inside then don't put the placeholder"
+                        excluded.push(dbResult);
                     }
                 }
 
