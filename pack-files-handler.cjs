@@ -13,6 +13,13 @@
 
 const axios = require('axios');
 
+// 🔥 VERSION CHECK - Verify HF is using updated code
+console.log('═══════════════════════════════════════════════════');
+console.log('📦 PACK-FILES-HANDLER v2.0 - VIDEO FILTER ENABLED');
+console.log('🎯 Filter: Only .mkv .mp4 .avi etc (NO .nfo .txt .jpg)');
+console.log('📅 Build: 2026-01-09T12:35 - OFF-BY-ONE FIX');
+console.log('═══════════════════════════════════════════════════');
+
 // Video file extensions
 const VIDEO_EXTENSIONS = /\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts|mpg|mpeg)$/i;
 
