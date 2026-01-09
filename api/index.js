@@ -6395,8 +6395,17 @@ async function handleStream(type, id, config, workerOrigin) {
                 }
 
                 // Determine final values (prefer resolved over existing)
-                const finalFileIndex = resolvedFileIndex !== null ? resolvedFileIndex : (dbResult.file_index !== null && dbResult.file_index !== undefined ? dbResult.file_index : undefined);
+                let finalFileIndex = resolvedFileIndex !== null ? resolvedFileIndex : (dbResult.file_index !== null && dbResult.file_index !== undefined ? dbResult.file_index : undefined);
                 const finalFileTitle = resolvedFileTitle || (dbResult.torrent_title ? dbResult.file_title : undefined);
+
+                // 🚨 POISON PURGE for Stranger Things S05 Pack (74a2)
+                // Known issue: DB learned Index 0 = S5E1, but Index 0 is Ep 4.
+                // If we resolved to 0, it's wrong. Wipe the DB learning for this hash to force re-learning.
+                if (dbResult.info_hash === '74a22624c3f2925b8bae27f1140fe69b96d98e68' && finalFileIndex === 0 && season === 5 && episode === 1) {
+                    console.warn(`🚨 [POISON DETECTED] Hash 74a2... resolved to Index 0 for S5E1 (Wrong). PURGING FILES info to force re-learn.`);
+                    await dbHelper.deleteFileInfo(dbResult.info_hash);
+                    finalFileIndex = undefined; // Force no index to let player decide/User select
+                }
                 const finalFileSize = resolvedFileSize || dbResult.file_size || torrentSize;
 
                 // ✅ Use file_size (single episode) if available, otherwise fallback to torrent_size (pack)
