@@ -9397,10 +9397,11 @@ export default async function handler(req, res) {
                                                                         infoHash,
                                                                         file.id,
                                                                         file.path,
+                                                                        file.bytes || 0,
                                                                         fileInfo
                                                                     );
 
-                                                                    console.log(`💾 [DB] Saved S${String(fileSeason).padStart(2, '0')}E${String(fileEpisode).padStart(2, '0')}: ${filename}`);
+                                                                    console.log(`💾 [DB] Saved S${String(fileSeason).padStart(2, '0')}E${String(fileEpisode).padStart(2, '0')}: ${filename} (${formatBytes(file.bytes || 0)})`);
                                                                 }
                                                             }
                                                         }
@@ -9557,10 +9558,11 @@ export default async function handler(req, res) {
                                                         infoHash,
                                                         file.id,
                                                         file.path,
+                                                        file.bytes || 0,
                                                         fileInfo
                                                     );
 
-                                                    console.log(`💾 [DB] Saved S${String(fileSeason).padStart(2, '0')}E${String(fileEpisode).padStart(2, '0')}: ${filename}`);
+                                                    console.log(`💾 [DB] Saved S${String(fileSeason).padStart(2, '0')}E${String(fileEpisode).padStart(2, '0')}: ${filename} (${formatBytes(file.bytes || 0)})`);
                                                 }
                                             }
                                         }
