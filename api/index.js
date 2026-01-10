@@ -7173,11 +7173,19 @@ async function handleStream(type, id, config, workerOrigin) {
                         const cachedFiles = await dbHelper.getSeriesPackFiles(infoHash);
                         if (cachedFiles && cachedFiles.length > 0) {
                             // CACHE HIT: It's a pack (or we have files logged)
+                            // Construct array of ALL possible titles to match against
+                            const candidateTitles = [
+                                mediaDetails.title,
+                                mediaDetails.originalName,
+                                ...(mediaDetails.titles || [])
+                            ].filter(Boolean);
+                            const uniqueTitles = [...new Set(candidateTitles)];
+
                             const fileInfo = await packFilesHandler.resolveMoviePackFile(
                                 infoHash,
                                 config,
                                 mediaDetails.imdbId,
-                                mediaDetails.title, // Use MAIN title for fuzzy match
+                                uniqueTitles, // ✅ Pass Array of Titles
                                 mediaDetails.year,
                                 dbHelper
                             );
