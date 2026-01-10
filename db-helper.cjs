@@ -1033,6 +1033,91 @@ async function getSeriesPackFiles(infoHash) {
   }
 }
 
+/**
+ * Search for specific files inside packs by title (FTS)
+ * Used for Movie Packs where we indexed all files
+ * [Updated] Added for P2P Pack Support
+ * @param {string} titleQuery - Title to search for
+ * @param {Array<string>} providers - Optional providers
+ */
+async function searchFilesByTitle(titleQuery, providers = null) {
+  if (!pool) throw new Error('Database not initialized');
+
+  try {
+    // Basic sanitation
+    const cleanQuery = titleQuery.replace(/[^\w\s]/g, ' ').trim().replace(/\s+/g, ' & ');
+    console.log(`💾 [DB] Searching FILES by title: "${titleQuery}" (FTS: ${cleanQuery})`);
+
+    let query = `
+      SELECT 
+        f.file_index,
+        f.title as file_title,
+        f.size as file_size,
+        t.info_hash,
+        t.provider,
+        t.title as torrent_title,
+        t.size as torrent_size,
+        t.seeders,
+        t.imdb_id,
+        t.cached_rd
+      FROM files f
+      JOIN torrents t ON f.info_hash = t.info_hash
+      WHERE to_tsvector('english', f.title) @@ to_tsquery('english', $1)
+    `;
+
+    const params = [cleanQuery];
+
+    if (providers && Array.isArray(providers) && providers.length > 0) {
+      const patterns = providers.map((p, i) => `t.provider ILIKE $${2 + i}`).join(' OR ');
+      query += ` AND (${patterns})`;
+      params.push(...providers.map(p => `%${p}%`));
+    }
+
+    query += ' ORDER BY t.cached_rd DESC NULLS LAST, t.seeders DESC LIMIT 20';
+
+    const result = await pool.query(query, params);
+    console.log(`💾 [DB] Found ${result.rows.length} file-matches for "${titleQuery}"`);
+    return result.rows;
+
+  } catch (error) {
+    // Fallback if FTS syntax error (e.g. strict chars)
+    console.warn(`⚠️ [DB] FTS File Search failed, trying simple ILIKE. Error: ${error.message}`);
+    try {
+      let query = `
+          SELECT 
+            f.file_index,
+            f.title as file_title,
+            f.size as file_size,
+            t.info_hash,
+            t.provider,
+            t.title as torrent_title,
+            t.size as torrent_size,
+            t.seeders,
+            t.imdb_id,
+            t.cached_rd
+          FROM files f
+          JOIN torrents t ON f.info_hash = t.info_hash
+          WHERE f.title ILIKE $1
+        `;
+      const params = [`%${titleQuery}%`];
+
+      if (providers && Array.isArray(providers) && providers.length > 0) {
+        const patterns = providers.map((p, i) => `t.provider ILIKE $${2 + i}`).join(' OR ');
+        query += ` AND (${patterns})`;
+        params.push(...providers.map(p => `%${p}%`));
+      }
+
+      query += ' ORDER BY t.cached_rd DESC NULLS LAST, t.seeders DESC LIMIT 20';
+      const result = await pool.query(query, params);
+      console.log(`💾 [DB] Found ${result.rows.length} file-matches (ILIKE) for "${titleQuery}"`);
+      return result.rows;
+    } catch (err2) {
+      console.error(`❌ [DB] Error searching files by title:`, err2.message);
+      return [];
+    }
+  }
+}
+
 module.exports = {
   initDatabase,
   searchByImdbId,
