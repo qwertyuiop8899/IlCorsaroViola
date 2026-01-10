@@ -122,8 +122,13 @@ async function fetchFilesFromRealDebrid(infoHash, rdKey) {
             throw new Error('No files in torrent info');
         }
 
-        const files = infoResponse.data.files.map(f => ({
-            id: f.id - 1, // RD uses 1-based indexing, convert to 0-based for P2P/WebTorrent compatibility
+        // Fix: Sort files alphabetically to match WebTorrent/Magnet index order
+        // RD 'id' is not reliable for playback index.
+        const rawFiles = infoResponse.data.files;
+        rawFiles.sort((a, b) => a.path.localeCompare(b.path));
+
+        const files = rawFiles.map((f, index) => ({
+            id: index, // Use sorted index as File Index (0-based)
             path: f.path,
             bytes: f.bytes,
             selected: f.selected
