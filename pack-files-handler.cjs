@@ -185,7 +185,10 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
             if (cacheData && typeof cacheData === 'object') {
                 const hashKey = Object.keys(cacheData).find(k => k.toLowerCase() === infoHash.toLowerCase());
                 if (hashKey && cacheData[hashKey]?.files && cacheData[hashKey].files.length > 0) {
-                    const files = cacheData[hashKey].files.map((f, idx) => ({
+                    const rawFiles = cacheData[hashKey].files;
+                    rawFiles.sort((a, b) => (a.name || a.path || '').localeCompare(b.name || b.path || ''));
+
+                    const files = rawFiles.map((f, idx) => ({
                         id: idx,
                         path: f.name || f.path || `file_${idx}`,
                         bytes: f.size || 0,
@@ -231,7 +234,10 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
             throw new Error('No files in Torbox torrent info');
         }
 
-        const files = torrent.files.map((f, idx) => ({
+        const rawFiles = torrent.files;
+        rawFiles.sort((a, b) => (a.name || a.path || '').localeCompare(b.name || b.path || ''));
+
+        const files = rawFiles.map((f, idx) => ({
             id: idx,
             path: f.name,
             bytes: f.size,
