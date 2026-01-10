@@ -5335,15 +5335,21 @@ async function handleStream(type, id, config, workerOrigin) {
 
                 // 📦 PRIORITY 1.5: Reverse Search (Find packs by File Name inside them - P2P/Index Support)
                 // This finds packs where we indexed the files (e.g. "Disney Collection") even if the pack itself isn't tagged with this IMDb ID.
+                // 🎬 FILTRO DOPPIO: excludeSeries=true + movieImdbId per evitare risultati di serie TV con parole simili nel titolo episodio
+                const fileSearchOptions = { 
+                    movieImdbId: mediaDetails.imdbId, 
+                    excludeSeries: true 
+                };
+                
                 if (mediaDetails.title) {
-                    const titleMatches = await dbHelper.searchFilesByTitle(mediaDetails.title, selectedProviders);
+                    const titleMatches = await dbHelper.searchFilesByTitle(mediaDetails.title, selectedProviders, fileSearchOptions);
                     if (titleMatches && titleMatches.length > 0) {
                         console.log(`💾 [DB] Found ${titleMatches.length} pack files via Reverse Title Search: "${mediaDetails.title}"`);
                         packResults.push(...titleMatches);
                     }
                 }
                 if (mediaDetails.originalName && mediaDetails.originalName !== mediaDetails.title) {
-                    const origMatches = await dbHelper.searchFilesByTitle(mediaDetails.originalName, selectedProviders);
+                    const origMatches = await dbHelper.searchFilesByTitle(mediaDetails.originalName, selectedProviders, fileSearchOptions);
                     if (origMatches && origMatches.length > 0) {
                         console.log(`💾 [DB] Found ${origMatches.length} pack files via Reverse Title Search: "${mediaDetails.originalName}"`);
                         packResults.push(...origMatches);
@@ -9222,7 +9228,7 @@ export default async function handler(req, res) {
                             return videoExtensions.some(ext => lowerPath.endsWith(ext));
                         })
                         .filter(file => file.bytes > 25 * 1024 * 1024); // Same as pack-files-handler.cjs
-                    
+
                     // For series/fallback: use original filter with junk keywords
                     const videoFiles = (torrent.files || [])
                         .filter(file => {
@@ -9240,14 +9246,14 @@ export default async function handler(req, res) {
                         // 🔥 FIX: Sort files ALPHABETICALLY to match how pack-files-handler saves indices
                         // pack-files-handler.cjs saves file_index as position in alphabetically sorted list (0-based)
                         const sortedVideoFiles = [...videoFilesForPack].sort((a, b) => a.path.localeCompare(b.path));
-                        
+
                         console.log(`[RealDebrid] 🎬 Pack movie - looking for file at sorted index ${packFileIdx}`);
                         console.log(`[RealDebrid] 📂 Sorted files (alphabetically):`);
                         sortedVideoFiles.forEach((f, i) => {
                             const marker = i === packFileIdx ? '👉' : '  ';
                             console.log(`${marker} [${i}] ${f.path.split('/').pop()} (${(f.bytes / 1024 / 1024).toFixed(0)}MB, id=${f.id})`);
                         });
-                        
+
                         targetFile = sortedVideoFiles[packFileIdx];
                         if (targetFile) {
                             console.log(`[RealDebrid] ✅ Found pack file at index ${packFileIdx}: ${targetFile.path} (id=${targetFile.id})`);
@@ -9353,13 +9359,13 @@ export default async function handler(req, res) {
                     const junkKeywords = ['sample', 'trailer', 'extra', 'bonus', 'extras'];
 
                     const selectedFiles = (torrent.files || []).filter(file => file.selected === 1);
-                    
+
                     // 🔥 For movie packs: use SAME filter as pack-files-handler.cjs (video + >25MB)
                     const allVideoFilesForPack = (torrent.files || []).filter(file => {
                         const lowerPath = file.path.toLowerCase();
                         return videoExtensions.some(ext => lowerPath.endsWith(ext)) && file.bytes > 25 * 1024 * 1024;
                     });
-                    
+
                     // For series: use filter with junk keywords
                     const allVideoFiles = (torrent.files || []).filter(file => {
                         const lowerPath = file.path.toLowerCase();
@@ -9412,14 +9418,14 @@ export default async function handler(req, res) {
                         // 🔥 FIX: Sort files ALPHABETICALLY to match how pack-files-handler saves indices
                         // Use allVideoFilesForPack which has SAME filter as pack-files-handler.cjs
                         const sortedAllVideoFiles = [...allVideoFilesForPack].sort((a, b) => a.path.localeCompare(b.path));
-                        
+
                         console.log(`[RealDebrid] 🎬 Pack movie (ready) - looking for file at sorted index ${packFileIdx}`);
                         console.log(`[RealDebrid] 📂 Sorted files (alphabetically):`);;
                         sortedAllVideoFiles.forEach((f, i) => {
                             const marker = i === packFileIdx ? '👉' : '  ';
                             console.log(`${marker} [${i}] ${f.path.split('/').pop()} (${(f.bytes / 1024 / 1024).toFixed(0)}MB, id=${f.id})`);
                         });
-                        
+
                         targetFile = sortedAllVideoFiles[packFileIdx];
                         if (targetFile) {
                             console.log(`[RealDebrid] ✅ Found pack file at index ${packFileIdx}: ${targetFile.path} (id=${targetFile.id})`);
@@ -9607,15 +9613,15 @@ export default async function handler(req, res) {
                     // 🔥 FIX: For movie packs, if target file is not selected, select it now
                     if (fileIndex === -1 && type === 'movie' && packFileIdx !== null) {
                         console.log(`[RealDebrid] ⚠️ Pack movie file not selected, selecting now...`);
-                        
+
                         // Select the target file
                         await realdebrid.selectFiles(torrent.id, targetFile.id);
-                        
+
                         // Re-fetch torrent info
                         torrent = await realdebrid.getTorrentInfo(torrent.id);
                         selectedForLink = (torrent.files || []).filter(f => f.selected === 1);
                         fileIndex = selectedForLink.findIndex(f => f.id === targetFile.id);
-                        
+
                         console.log(`[RealDebrid] ✅ File selected, new index: ${fileIndex}`);
                     }
 
@@ -10457,7 +10463,7 @@ export default async function handler(req, res) {
             let packFileIdx = null;
             let seasonParam = null;
             let episodeParam = null;
-            
+
             if (seasonOrPackFlag === 'pack') {
                 // Movie pack: /torbox-stream/config/magnet/pack/0
                 packFileIdx = episodeOrFileIdx;
@@ -10542,7 +10548,7 @@ export default async function handler(req, res) {
                 const _unrestrictLink = async (torrent) => {
                     // 🔥 SAME extensions as pack-files-handler.cjs VIDEO_EXTENSIONS
                     const videoExtensions = ['.mkv', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts', '.m2ts', '.mpg', '.mpeg'];
-                    
+
                     // All video files (for series pattern matching)
                     const videos = (torrent.files || [])
                         .filter(file => {
@@ -10550,7 +10556,7 @@ export default async function handler(req, res) {
                             return videoExtensions.some(ext => name.endsWith(ext));
                         })
                         .sort((a, b) => b.size - a.size);
-                    
+
                     // 🔥 For movie packs: use SAME filter as pack-files-handler.cjs (video + >25MB)
                     const videosForPack = (torrent.files || [])
                         .filter(file => {
@@ -10569,7 +10575,7 @@ export default async function handler(req, res) {
                             const nameB = b.short_name || b.name || '';
                             return nameA.localeCompare(nameB);
                         });
-                        
+
                         console.log(`[Torbox] 🎬 Pack movie - looking for file at sorted index ${packFileIdx}`);
                         console.log(`[Torbox] 📂 Sorted files (alphabetically):`);
                         sortedVideos.forEach((f, i) => {
@@ -10577,7 +10583,7 @@ export default async function handler(req, res) {
                             const marker = i === packFileIdx ? '👉' : '  ';
                             console.log(`${marker} [${i}] ${name} (${(f.size / 1024 / 1024).toFixed(0)}MB, id=${f.id})`);
                         });
-                        
+
                         targetVideo = sortedVideos[packFileIdx];
                         if (targetVideo) {
                             console.log(`[Torbox] ✅ Found pack file at index ${packFileIdx}: ${targetVideo.short_name || targetVideo.name} (id=${targetVideo.id})`);
