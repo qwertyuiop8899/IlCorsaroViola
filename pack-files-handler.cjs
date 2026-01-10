@@ -652,8 +652,10 @@ function findMovieFile(files, targetTitle, targetYear) {
             score += (matchedWords / targetWords.length) * 50;
         }
 
-        // 3. Negative keywords (optional, e.g. "trailer", "sample" handled by size but just in case)
+        // 3. Negative keywords
         if (filename.includes('trailer') || filename.includes('sample')) score -= 50;
+
+        console.log(`🔍 [FUZZY DEBUG] Comparing "${filename}" vs "${targetTitle}" (${targetYear}) -> Score: ${score}`);
 
         if (score > maxScore && score > 60) { // Threshold 60 avoids completely random matches
             maxScore = score;
