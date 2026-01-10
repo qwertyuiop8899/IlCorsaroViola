@@ -307,26 +307,23 @@ async function updateRdCacheStatus(cacheResults, mediaType = null) {
           last_cached_check = NOW(),
           file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
           size = COALESCE(EXCLUDED.size, torrents.size),
-          title = CASE WHEN torrents.provider = 'rd_cache' THEN COALESCE(EXCLUDED.title, torrents.title) ELSE torrents.title END,
+          title = CASE WHEN torrents.provider = 'rd_cache' AND EXCLUDED.file_title IS NOT NULL THEN EXCLUDED.file_title ELSE torrents.title END,
           type = CASE WHEN torrents.type = 'unknown' THEN COALESCE(EXCLUDED.type, torrents.type) ELSE torrents.type END
       `;
 
-      // Use torrent_title from RD as primary title, then file_title, then fallback
-      const fallbackTitle = result.torrent_title || result.file_title || `RD-${hashLower.substring(0, 8)}`;
+      // Use file_title as fallback title, or generate one from hash
+      const fallbackTitle = result.file_title || `RD-${hashLower.substring(0, 8)}`;
 
       // ✅ FIX: Force cached_rd to true (we only call this for cached items)
       // Previously result.cached could be undefined which would insert NULL
       const cachedValue = result.cached === true ? true : (result.cached === false ? false : true);
-
-      // ✅ Use torrent total size primarily, then file size
-      const torrentSize = result.size || result.file_size || null;
 
       const params = [
         hashLower,                           // $1 info_hash
         fallbackTitle,                       // $2 title  
         cachedValue,                         // $3 cached_rd (forced to true if undefined)
         result.file_title || null,           // $4 file_title
-        torrentSize,                         // $5 size (updated to use total size)
+        result.size || null,                 // $5 size
         mediaType || 'unknown'               // $6 type
       ];
 
@@ -512,11 +509,11 @@ async function batchInsertTorrents(torrents) {
  * @param {Object} episodeInfo - Optional: {imdbId, season, episode} for series
  * @returns {Promise<boolean>} Success status
  */
-async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = null, episodeInfo = null) {
+async function updateTorrentFileInfo(infoHash, fileIndex, filePath, episodeInfo = null) {
   if (!pool) throw new Error('Database not initialized');
 
   try {
-    console.log(`💾 [DB updateTorrentFileInfo] Input: hash=${infoHash}, fileIndex=${fileIndex}, size=${fileSize}, filePath=${filePath}, episodeInfo=`, episodeInfo);
+    console.log(`💾 [DB updateTorrentFileInfo] Input: hash=${infoHash}, fileIndex=${fileIndex}, filePath=${filePath}, episodeInfo=`, episodeInfo);
 
     // Extract just the filename from path
     const fileName = filePath.split('/').pop().split('\\').pop();
@@ -542,12 +539,11 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
       ]);
 
       if (checkRes.rowCount > 0) {
-        // Record already exists for this episode - just update the title and size if needed
+        // Record already exists for this episode - just update the title if needed
         const updateQuery = `
           UPDATE files
           SET file_index = $1,
-              title = $2,
-              size = COALESCE($7, size)
+              title = $2
           WHERE info_hash = $3 
             AND imdb_id = $4 
             AND imdb_season = $5 
@@ -559,8 +555,7 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
           infoHash.toLowerCase(),
           episodeInfo.imdbId,
           episodeInfo.season,
-          episodeInfo.episode,
-          fileSize // $7
+          episodeInfo.episode
         ]);
         console.log(`✅ [DB] Updated file in 'files' table: ${fileName} (rowCount=${res.rowCount})`);
         return res.rowCount > 0;
@@ -580,14 +575,13 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
 
         // Insert new file (UPSERT - update if exists)
         const insertQuery = `
-          INSERT INTO files (info_hash, file_index, title, imdb_id, imdb_season, imdb_episode, size)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          INSERT INTO files (info_hash, file_index, title, imdb_id, imdb_season, imdb_episode)
+          VALUES ($1, $2, $3, $4, $5, $6)
           ON CONFLICT (info_hash, file_index) DO UPDATE SET
             title = EXCLUDED.title,
             imdb_id = EXCLUDED.imdb_id,
             imdb_season = EXCLUDED.imdb_season,
-            imdb_episode = EXCLUDED.imdb_episode,
-            size = EXCLUDED.size
+            imdb_episode = EXCLUDED.imdb_episode
         `;
         const res = await pool.query(insertQuery, [
           infoHash.toLowerCase(),
@@ -595,8 +589,7 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
           fileName,
           episodeInfo.imdbId,
           episodeInfo.season,
-          episodeInfo.episode,
-          fileSize // $7
+          episodeInfo.episode
         ]);
 
         console.log(`✅ [DB] Upserted file into 'files' table: ${fileName}`);
@@ -1033,91 +1026,6 @@ async function getSeriesPackFiles(infoHash) {
   }
 }
 
-/**
- * Search for specific files inside packs by title (FTS)
- * Used for Movie Packs where we indexed all files
- * [Updated] Added for P2P Pack Support
- * @param {string} titleQuery - Title to search for
- * @param {Array<string>} providers - Optional providers
- */
-async function searchFilesByTitle(titleQuery, providers = null) {
-  if (!pool) throw new Error('Database not initialized');
-
-  try {
-    // Basic sanitation
-    const cleanQuery = titleQuery.replace(/[^\w\s]/g, ' ').trim().replace(/\s+/g, ' & ');
-    console.log(`💾 [DB] Searching FILES by title: "${titleQuery}" (FTS: ${cleanQuery})`);
-
-    let query = `
-      SELECT 
-        f.file_index,
-        f.title as file_title,
-        f.size as file_size,
-        t.info_hash,
-        t.provider,
-        t.title as torrent_title,
-        t.size as torrent_size,
-        t.seeders,
-        t.imdb_id,
-        t.cached_rd
-      FROM files f
-      JOIN torrents t ON f.info_hash = t.info_hash
-      WHERE to_tsvector('english', f.title) @@ to_tsquery('english', $1)
-    `;
-
-    const params = [cleanQuery];
-
-    if (providers && Array.isArray(providers) && providers.length > 0) {
-      const patterns = providers.map((p, i) => `t.provider ILIKE $${2 + i}`).join(' OR ');
-      query += ` AND (${patterns})`;
-      params.push(...providers.map(p => `%${p}%`));
-    }
-
-    query += ' ORDER BY t.cached_rd DESC NULLS LAST, t.seeders DESC LIMIT 20';
-
-    const result = await pool.query(query, params);
-    console.log(`💾 [DB] Found ${result.rows.length} file-matches for "${titleQuery}"`);
-    return result.rows;
-
-  } catch (error) {
-    // Fallback if FTS syntax error (e.g. strict chars)
-    console.warn(`⚠️ [DB] FTS File Search failed, trying simple ILIKE. Error: ${error.message}`);
-    try {
-      let query = `
-          SELECT 
-            f.file_index,
-            f.title as file_title,
-            f.size as file_size,
-            t.info_hash,
-            t.provider,
-            t.title as torrent_title,
-            t.size as torrent_size,
-            t.seeders,
-            t.imdb_id,
-            t.cached_rd
-          FROM files f
-          JOIN torrents t ON f.info_hash = t.info_hash
-          WHERE f.title ILIKE $1
-        `;
-      const params = [`%${titleQuery}%`];
-
-      if (providers && Array.isArray(providers) && providers.length > 0) {
-        const patterns = providers.map((p, i) => `t.provider ILIKE $${2 + i}`).join(' OR ');
-        query += ` AND (${patterns})`;
-        params.push(...providers.map(p => `%${p}%`));
-      }
-
-      query += ' ORDER BY t.cached_rd DESC NULLS LAST, t.seeders DESC LIMIT 20';
-      const result = await pool.query(query, params);
-      console.log(`💾 [DB] Found ${result.rows.length} file-matches (ILIKE) for "${titleQuery}"`);
-      return result.rows;
-    } catch (err2) {
-      console.error(`❌ [DB] Error searching files by title:`, err2.message);
-      return [];
-    }
-  }
-}
-
 module.exports = {
   initDatabase,
   searchByImdbId,
@@ -1139,6 +1047,5 @@ module.exports = {
   getSeriesPackFiles,
   updatePackAllImdbIds,
   insertEpisodeFiles,
-  closeDatabase,
-  searchFilesByTitle
+  closeDatabase
 };
