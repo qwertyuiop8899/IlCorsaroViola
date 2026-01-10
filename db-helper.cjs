@@ -1054,5 +1054,6 @@ module.exports = {
   getSeriesPackFiles,
   updatePackAllImdbIds,
   insertEpisodeFiles,
-  closeDatabase
+  closeDatabase,
+  searchFilesByTitle
 };
