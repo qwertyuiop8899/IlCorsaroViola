@@ -7211,6 +7211,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 // Separate known/verified from unverified
                 const verifiedMovies = [];
                 const unverifiedMovies = [];
+                const corruptedCacheHashes = new Set(); // 🔧 Track hashes with corrupted cache
 
                 for (const res of filteredResults) {
                     // If it already has fileIndex, it's a known pack file from DB
@@ -7226,6 +7227,9 @@ async function handleStream(type, id, config, workerOrigin) {
                             isClean = true;
                         } else {
                             console.log(`⚠️ [MOVIE SANITY] Cached file "${res.file_title}" does NOT match requested "${mediaDetails.title}" (Sim: ${similarity.toFixed(2)}). Re-verifying pack.`);
+                            // 🔧 Mark this hash as having corrupted cache
+                            const hash = res.infoHash?.toLowerCase() || res.magnetLink?.match(/btih:([a-fA-F0-9]{40})/i)?.[1]?.toLowerCase();
+                            if (hash) corruptedCacheHashes.add(hash);
                         }
                     }
 
@@ -7256,7 +7260,16 @@ async function handleStream(type, id, config, workerOrigin) {
                     // Only check cache if size seems like a pack (> 4GB typically, but let's check all large ones)
                     // Actually, check all. Cache is fast.
                     try {
-                        const cachedFiles = await dbHelper.getSeriesPackFiles(infoHash);
+                        // 🔧 Check if this hash was marked as having corrupted cache
+                        const needsForceRefresh = corruptedCacheHashes.has(infoHash);
+                        
+                        // If corrupted cache, delete it first before re-fetching
+                        if (needsForceRefresh && typeof dbHelper.deletePackFilesCache === 'function') {
+                            console.log(`🗑️ [MOVIE VERIFY] Deleting corrupted cache for ${infoHash.substring(0, 8)}...`);
+                            await dbHelper.deletePackFilesCache(infoHash);
+                        }
+                        
+                        const cachedFiles = needsForceRefresh ? [] : await dbHelper.getSeriesPackFiles(infoHash);
                         if (cachedFiles && cachedFiles.length > 0) {
                             // CACHE HIT: It's a pack (or we have files logged)
                             // Construct array of ALL possible titles to match against
@@ -7295,7 +7308,7 @@ async function handleStream(type, id, config, workerOrigin) {
                                 excluded.push(result);
                             }
                         } else {
-                            // CACHE MISS: Add to external queue
+                            // CACHE MISS or was cleared: Add to external queue for fresh fetch
                             needsExternalVerification.push(result);
                         }
                     } catch (e) {
