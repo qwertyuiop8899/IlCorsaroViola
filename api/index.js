@@ -7953,9 +7953,11 @@ async function handleStream(type, id, config, workerOrigin) {
                         streamUrl = `${workerOrigin}/torbox-stream/${encodedConfig}/${encodeURIComponent(result.magnetLink)}/${season}/${episode}`;
                         console.log(`📦 [Torbox] Stream URL with S${season}E${episode}: ${result.title}`);
                     } else if (type === 'movie' && result.fileIndex !== undefined && result.fileIndex !== null) {
-                        // Movie pack: add fileIdx to URL (same as RD)
-                        streamUrl = `${workerOrigin}/torbox-stream/${encodedConfig}/${encodeURIComponent(result.magnetLink)}/pack/${result.fileIndex}`;
-                        console.log(`📦 [Torbox] Stream URL with pack file index ${result.fileIndex}: ${result.title}`);
+                        // Movie pack: pass filename for matching (since Torbox IDs differ from RD)
+                        const packFileName = result.file_title || result.file_path || '';
+                        const encodedFileName = encodeURIComponent(packFileName.split('/').pop()); // Just the filename
+                        streamUrl = `${workerOrigin}/torbox-stream/${encodedConfig}/${encodeURIComponent(result.magnetLink)}/packfile/${encodedFileName}`;
+                        console.log(`📦 [Torbox] Stream URL with pack filename "${packFileName}": ${result.title}`);
                     } else if (type === 'movie' && result.packSize && result.packSize > 5 * 1024 * 1024 * 1024) {
                         // ✅ Movie pack WITHOUT verified fileIndex - pass title+year for runtime resolution
                         const movieTitle = encodeURIComponent(mediaDetails.title || '');
@@ -10724,22 +10726,27 @@ export default async function handler(req, res) {
             const pathParts = url.pathname.split('/');
             const encodedConfigStr = pathParts[2];
             const encodedMagnet = pathParts[3];
-            const seasonOrPackFlag = pathParts[4]; // 'pack', 'movie', or season number
-            const episodeOrFileIdxOrTitle = pathParts[5] ? pathParts[5] : null; // episode number, fileIdx, or movie title
+            const seasonOrPackFlag = pathParts[4]; // 'pack', 'packfile', 'movie', or season number
+            const episodeOrFileIdxOrTitle = pathParts[5] ? pathParts[5] : null; // episode number, fileIdx, filename, or movie title
             const yearIfMovie = pathParts[6] ? pathParts[6] : null; // year for movie pack resolution
             const workerOrigin = url.origin; // For placeholder video URLs
 
             // Determine type and extract parameters (same logic as RD)
             let packFileIdx = null;
+            let packFileName = null; // NEW: filename for Torbox matching
             let seasonParam = null;
             let episodeParam = null;
             let movieTitleForMatch = null;
             let movieYearForMatch = null;
 
             if (seasonOrPackFlag === 'pack') {
-                // Movie pack: /torbox-stream/config/magnet/pack/0
+                // Movie pack (legacy): /torbox-stream/config/magnet/pack/0
                 packFileIdx = parseInt(episodeOrFileIdxOrTitle);
-                console.log(`[Torbox] 🎬 Movie pack mode - fileIdx=${packFileIdx}`);
+                console.log(`[Torbox] 🎬 Movie pack mode (legacy) - fileIdx=${packFileIdx}`);
+            } else if (seasonOrPackFlag === 'packfile') {
+                // Movie pack (NEW): /torbox-stream/config/magnet/packfile/filename.mkv
+                packFileName = episodeOrFileIdxOrTitle ? decodeURIComponent(episodeOrFileIdxOrTitle) : null;
+                console.log(`[Torbox] 🎬 Movie pack mode - filename="${packFileName}"`);
             } else if (seasonOrPackFlag === 'movie') {
                 // ✅ Movie pack WITHOUT fileIdx - resolve by title+year
                 movieTitleForMatch = episodeOrFileIdxOrTitle ? decodeURIComponent(episodeOrFileIdxOrTitle) : null;
@@ -10843,11 +10850,37 @@ export default async function handler(req, res) {
 
                     let targetVideo;
 
-                    // ✅ PRIORITY 1: For movie packs, use packFileIdx as Torbox file.id (NOT alphabetical index!)
-                    if (packFileIdx !== null && packFileIdx !== undefined) {
-                        // 🔥 FIX: packFileIdx IS the Torbox file.id - search by ID, not alphabetical order!
-                        // The DB stores the original file.id from Torbox/RD, not alphabetical position
-                        console.log(`[Torbox] 🎬 Pack movie - looking for file with id=${packFileIdx}`);
+                    // ✅ PRIORITY 0: For movie packs with filename, search by filename (most reliable)
+                    if (packFileName) {
+                        console.log(`[Torbox] 🎬 Pack movie - looking for file by name: "${packFileName}"`);
+                        console.log(`[Torbox] 📂 Available files:`);
+                        
+                        // Normalize filename for comparison (lowercase, remove path)
+                        const targetName = packFileName.toLowerCase().split('/').pop();
+                        
+                        videosForPack.forEach((f) => {
+                            const name = (f.short_name || f.name || 'unknown').toLowerCase().split('/').pop();
+                            const isMatch = name === targetName || name.includes(targetName) || targetName.includes(name);
+                            const marker = isMatch ? '👉' : '  ';
+                            console.log(`${marker} [id=${f.id}] ${f.short_name || f.name} (${(f.size / 1024 / 1024).toFixed(0)}MB)`);
+                        });
+
+                        // Search by filename
+                        targetVideo = videosForPack.find(f => {
+                            const name = (f.short_name || f.name || '').toLowerCase().split('/').pop();
+                            return name === targetName || name.includes(targetName) || targetName.includes(name);
+                        });
+                        
+                        if (targetVideo) {
+                            console.log(`[Torbox] ✅ Found pack file by name: ${targetVideo.short_name || targetVideo.name}`);
+                        } else {
+                            console.log(`[Torbox] ❌ Pack file "${packFileName}" not found!`);
+                        }
+                    }
+                    // ✅ PRIORITY 1: For movie packs (legacy), use packFileIdx as Torbox file.id
+                    else if (packFileIdx !== null && packFileIdx !== undefined) {
+                        // Legacy fallback - search by ID (may not work if IDs differ from RD)
+                        console.log(`[Torbox] 🎬 Pack movie (legacy) - looking for file with id=${packFileIdx}`);
                         console.log(`[Torbox] 📂 Available files:`);
                         videosForPack.forEach((f) => {
                             const name = f.short_name || f.name || 'unknown';
@@ -10855,7 +10888,7 @@ export default async function handler(req, res) {
                             console.log(`${marker} [id=${f.id}] ${name} (${(f.size / 1024 / 1024).toFixed(0)}MB)`);
                         });
 
-                        // Search by file.id, NOT by alphabetical index
+                        // Search by file.id
                         targetVideo = videosForPack.find(f => f.id === packFileIdx);
                         if (targetVideo) {
                             console.log(`[Torbox] ✅ Found pack file with id=${packFileIdx}: ${targetVideo.short_name || targetVideo.name}`);
