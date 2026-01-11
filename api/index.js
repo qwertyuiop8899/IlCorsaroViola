@@ -5361,6 +5361,20 @@ async function handleStream(type, id, config, workerOrigin) {
                     console.log(`💾 [DB] Found ${packResults.length} pack(s) containing film ${mediaDetails.imdbId}`);
                 }
 
+                // 📦 PRIORITY 1.3: Search pack_files by movie TITLE (for unindexed movies in packs)
+                // This finds movies like "Basil" in Disney pack even if not pre-indexed with IMDb
+                if (mediaDetails.title) {
+                    const titlePackMatches = await dbHelper.searchPacksByTitle(
+                        mediaDetails.title, 
+                        mediaDetails.year ? String(mediaDetails.year) : null,
+                        mediaDetails.imdbId  // Auto-index if found
+                    );
+                    if (titlePackMatches && titlePackMatches.length > 0) {
+                        console.log(`💾 [DB] Found ${titlePackMatches.length} pack file(s) via Title Search: "${mediaDetails.title}"`);
+                        packResults.push(...titlePackMatches);
+                    }
+                }
+
                 // 📦 PRIORITY 1.5: Reverse Search (Find packs by File Name inside them - P2P/Index Support)
                 // This finds packs where we indexed the files (e.g. "Disney Collection") even if the pack itself isn't tagged with this IMDb ID.
                 // 🎬 FILTRO DOPPIO: excludeSeries=true + movieImdbId per evitare risultati di serie TV con parole simili nel titolo episodio
@@ -9318,24 +9332,22 @@ export default async function handler(req, res) {
                         })
                         .sort((a, b) => b.bytes - a.bytes);
 
-                    // ✅ PRIORITY 1: For movie packs, use packFileIdx (0-based index in ALPHABETICAL list)
+                    // ✅ PRIORITY 1: For movie packs, use packFileIdx as RD FILE ID (not alphabetical index)
+                    // The URL contains the original RD file.id, so we search by id, not by position
                     if (type === 'movie' && packFileIdx !== null && packFileIdx !== undefined) {
-                        // 🔥 FIX: Sort files ALPHABETICALLY to match torrent file order for P2P
-                        // This matches how we save indices in pack-files-handler.cjs
-                        const sortedVideoFiles = [...videoFilesForPack].sort((a, b) => (a.path || '').localeCompare(b.path || ''));
-
-                        console.log(`[RealDebrid] 🎬 Pack movie - looking for file at sorted index ${packFileIdx}`);
-                        console.log(`[RealDebrid] 📂 Sorted files (ALPHABETICAL for P2P/RD consistency):`);
-                        sortedVideoFiles.forEach((f, i) => {
-                            const marker = i === packFileIdx ? '👉' : '  ';
-                            console.log(`${marker} [${i}] ${f.path.split('/').pop()} (${(f.bytes / 1024 / 1024).toFixed(0)}MB, id=${f.id})`);
+                        console.log(`[RealDebrid] 🎬 Pack movie - looking for file with RD id=${packFileIdx}`);
+                        console.log(`[RealDebrid] 📂 Available video files (${videoFilesForPack.length}):`);
+                        videoFilesForPack.forEach((f, i) => {
+                            const marker = f.id === packFileIdx ? '👉' : '  ';
+                            console.log(`${marker} [id=${f.id}] ${f.path.split('/').pop()} (${(f.bytes / 1024 / 1024).toFixed(0)}MB)`);
                         });
 
-                        targetFile = sortedVideoFiles[packFileIdx];
+                        // 🔥 FIX: Search by file.id (RD's original ID), NOT by alphabetical index
+                        targetFile = videoFilesForPack.find(f => f.id === packFileIdx);
                         if (targetFile) {
-                            console.log(`[RealDebrid] ✅ Found pack file at index ${packFileIdx}: ${targetFile.path} (id=${targetFile.id})`);
+                            console.log(`[RealDebrid] ✅ Found pack file with id=${packFileIdx}: ${targetFile.path}`);
                         } else {
-                            console.log(`[RealDebrid] ❌ Pack file index ${packFileIdx} out of range! Max: ${sortedVideoFiles.length - 1}`);
+                            console.log(`[RealDebrid] ❌ No file found with id=${packFileIdx}! Available ids: ${videoFilesForPack.map(f => f.id).join(', ')}`);
                         }
                     }
 
@@ -9537,24 +9549,22 @@ export default async function handler(req, res) {
 
                     let targetFile = null;
 
-                    // ✅ PRIORITY 1: For movie packs, use packFileIdx (0-based index in ALPHABETICAL list)
+                    // ✅ PRIORITY 1: For movie packs, use packFileIdx as RD FILE ID (not alphabetical index)
+                    // The URL contains the original RD file.id, so we search by id, not by position
                     if (type === 'movie' && packFileIdx !== null && packFileIdx !== undefined) {
-                        // 🔥 FIX: Sort files ALPHABETICALLY to match torrent file order for P2P
-                        // This matches how we save indices in pack-files-handler.cjs
-                        const sortedAllVideoFiles = [...allVideoFilesForPack].sort((a, b) => (a.path || '').localeCompare(b.path || ''));
-
-                        console.log(`[RealDebrid] 🎬 Pack movie (ready) - looking for file at sorted index ${packFileIdx}`);
-                        console.log(`[RealDebrid] 📂 Sorted files (ALPHABETICAL for P2P/RD consistency):`);
-                        sortedAllVideoFiles.forEach((f, i) => {
-                            const marker = i === packFileIdx ? '👉' : '  ';
-                            console.log(`${marker} [${i}] ${f.path.split('/').pop()} (${(f.bytes / 1024 / 1024).toFixed(0)}MB, id=${f.id})`);
+                        console.log(`[RealDebrid] 🎬 Pack movie (ready) - looking for file with RD id=${packFileIdx}`);
+                        console.log(`[RealDebrid] 📂 Available video files (${allVideoFilesForPack.length}):`);
+                        allVideoFilesForPack.forEach((f, i) => {
+                            const marker = f.id === packFileIdx ? '👉' : '  ';
+                            console.log(`${marker} [id=${f.id}] ${f.path.split('/').pop()} (${(f.bytes / 1024 / 1024).toFixed(0)}MB)`);
                         });
 
-                        targetFile = sortedAllVideoFiles[packFileIdx];
+                        // 🔥 FIX: Search by file.id (RD's original ID), NOT by alphabetical index
+                        targetFile = allVideoFilesForPack.find(f => f.id === packFileIdx);
                         if (targetFile) {
-                            console.log(`[RealDebrid] ✅ Found pack file at index ${packFileIdx}: ${targetFile.path} (id=${targetFile.id})`);
+                            console.log(`[RealDebrid] ✅ Found pack file with id=${packFileIdx}: ${targetFile.path}`);
                         } else {
-                            console.log(`[RealDebrid] ❌ Pack file index ${packFileIdx} out of range! Max: ${sortedAllVideoFiles.length - 1}`);
+                            console.log(`[RealDebrid] ❌ No file found with id=${packFileIdx}! Available ids: ${allVideoFilesForPack.map(f => f.id).join(', ')}`);
                         }
                     }
 
