@@ -907,6 +907,92 @@ async function searchPacksByImdbId(imdbId) {
 }
 
 /**
+ * Search pack files by movie title (for movies only)
+ * This enables finding movies in packs without pre-indexing all IMDb IDs
+ * @param {string} title - Movie title to search for
+ * @param {string} year - Release year (optional)
+ * @param {string} imdbId - IMDb ID to update pack_files if match found
+ * @returns {Promise<Array>} Array of pack torrents with file info
+ */
+async function searchPacksByTitle(title, year = null, imdbId = null) {
+  if (!pool) throw new Error('Database not initialized');
+  if (!title || title.length < 3) return [];
+
+  try {
+    console.log(`💾 [DB] Searching packs by title: "${title}" (${year || 'no year'})`);
+
+    // Build search pattern - clean title for ILIKE matching
+    const cleanTitle = title.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')  // Remove special chars
+      .replace(/\s+/g, '%')          // Replace spaces with wildcards
+      .trim();
+    
+    const searchPattern = `%${cleanTitle}%`;
+    const yearPattern = year ? `%${year}%` : null;
+
+    // Search pack_files for matching file_path
+    // This finds files like "(1986) Basil L'Investigatopo.mkv"
+    const query = `
+      SELECT 
+        t.info_hash,
+        t.provider,
+        t.title,
+        t.size,
+        t.type,
+        t.seeders,
+        t.cached_rd,
+        t.last_cached_check,
+        pf.file_index,
+        pf.file_path,
+        pf.file_path as file_title,
+        pf.file_size,
+        pf.imdb_id as film_imdb_id
+      FROM torrents t
+      INNER JOIN pack_files pf ON t.info_hash = pf.pack_hash
+      WHERE LOWER(pf.file_path) LIKE $1
+        ${yearPattern ? 'AND pf.file_path LIKE $2' : ''}
+      ORDER BY t.seeders DESC, t.size DESC
+      LIMIT 20
+    `;
+
+    const params = yearPattern ? [searchPattern, yearPattern] : [searchPattern];
+    const result = await pool.query(query, params);
+    
+    console.log(`   ✅ Found ${result.rows.length} pack file(s) matching "${title}"`);
+
+    // If we found matches and have an imdbId, update pack_files to add the mapping
+    if (result.rows.length > 0 && imdbId) {
+      for (const row of result.rows) {
+        try {
+          await pool.query(`
+            UPDATE pack_files 
+            SET imdb_id = $1 
+            WHERE pack_hash = $2 AND file_index = $3 AND (imdb_id IS NULL OR imdb_id = '')
+          `, [imdbId, row.info_hash, row.file_index]);
+          
+          // Also update all_imdb_ids on torrents table
+          await pool.query(`
+            UPDATE torrents 
+            SET all_imdb_ids = COALESCE(all_imdb_ids, '[]'::jsonb) || $1::jsonb
+            WHERE info_hash = $2 
+              AND NOT (COALESCE(all_imdb_ids, '[]'::jsonb) @> $1::jsonb)
+          `, [JSON.stringify(imdbId), row.info_hash]);
+          
+          console.log(`   📝 [DB] Auto-indexed ${imdbId} -> pack ${row.info_hash.substring(0,8)}... file_idx=${row.file_index}`);
+        } catch (updateErr) {
+          // Ignore update errors (e.g., constraint violations)
+        }
+      }
+    }
+
+    return result.rows;
+  } catch (error) {
+    console.error(`❌ Error searching packs by title "${title}":`, error.message);
+    return [];
+  }
+}
+
+/**
  * Insert pack files mapping
  * @param {Array} packFiles - Array of {pack_hash, imdb_id, file_index, file_path, file_size}
  * @returns {Promise<number>} Number of inserted records
@@ -1233,6 +1319,7 @@ module.exports = {
   getImdbIdByHash,
   updateTorrentsWithIds,
   searchPacksByImdbId,
+  searchPacksByTitle,
   insertPackFiles,
   getPackFiles,
   getSeriesPackFiles,
