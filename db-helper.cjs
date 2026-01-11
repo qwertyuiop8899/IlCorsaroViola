@@ -1225,7 +1225,8 @@ async function insertEpisodeFiles(episodeFiles) {
 }
 
 /**
- * Get all files for a series pack from the DB
+ * Get all files for a pack from the DB
+ * Searches pack_files first (movie packs with correct file.id), then files table as fallback
  * @param {string} infoHash - InfoHash of the torrent
  * @returns {Promise<Array>} Array of cached files
  */
@@ -1233,22 +1234,48 @@ async function getSeriesPackFiles(infoHash) {
   if (!pool) throw new Error('Database not initialized');
 
   try {
-    const query = `
-            SELECT file_index as id, title as path, size as bytes
-            FROM files 
-            WHERE info_hash = $1
-            ORDER BY file_index ASC
-        `;
-
-    const result = await pool.query(query, [infoHash.toLowerCase()]);
-    return result.rows.map(row => ({
+    const hashLower = infoHash.toLowerCase();
+    
+    // 1️⃣ PRIORITY: Check pack_files first (has correct RD file.id indices)
+    const packFilesQuery = `
+      SELECT file_index as id, file_path as path, file_size as bytes
+      FROM pack_files 
+      WHERE pack_hash = $1
+      ORDER BY file_path ASC
+    `;
+    const packResult = await pool.query(packFilesQuery, [hashLower]);
+    
+    if (packResult.rows.length > 0) {
+      console.log(`💾 [DB] Found ${packResult.rows.length} files in pack_files for ${infoHash.substring(0, 8)}`);
+      return packResult.rows.map(row => ({
+        id: row.id,
+        path: row.path,
+        bytes: parseInt(row.bytes) || 0,
+        selected: 1
+      }));
+    }
+    
+    // 2️⃣ FALLBACK: Check files table (for series packs)
+    const filesQuery = `
+      SELECT file_index as id, title as path, size as bytes
+      FROM files 
+      WHERE info_hash = $1
+      ORDER BY file_index ASC
+    `;
+    const filesResult = await pool.query(filesQuery, [hashLower]);
+    
+    if (filesResult.rows.length > 0) {
+      console.log(`💾 [DB] Found ${filesResult.rows.length} files in files table for ${infoHash.substring(0, 8)}`);
+    }
+    
+    return filesResult.rows.map(row => ({
       id: row.id,
       path: row.path,
-      bytes: parseInt(row.bytes),
+      bytes: parseInt(row.bytes) || 0,
       selected: 1
     }));
   } catch (error) {
-    console.error(`❌ [DB] Error getting series pack files: ${error.message}`);
+    console.error(`❌ [DB] Error getting pack files: ${error.message}`);
     return [];
   }
 }
