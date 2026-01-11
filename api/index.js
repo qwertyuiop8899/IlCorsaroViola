@@ -5404,6 +5404,54 @@ async function handleStream(type, id, config, workerOrigin) {
                     }
                 }
 
+                // 🔧 FIX: Sanity check pack results from DB - verify file_title matches requested movie
+                // This catches corrupted cache entries (e.g., Dumbo IMDb mapped to Basil file)
+                if (packResults.length > 0 && mediaDetails.title) {
+                    const normalizeForMatch = (str) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim() : '';
+                    const requestedTitle = normalizeForMatch(mediaDetails.title);
+                    const requestedOriginal = mediaDetails.originalName ? normalizeForMatch(mediaDetails.originalName) : '';
+                    const requestedWords = [...new Set([...requestedTitle.split(' '), ...requestedOriginal.split(' ')].filter(w => w.length > 2))];
+                    
+                    const validPackResults = [];
+                    const corruptedHashes = [];
+                    
+                    for (const pack of packResults) {
+                        const fileTitle = normalizeForMatch(pack.file_title || pack.file_path || '');
+                        const fileWords = fileTitle.split(' ').filter(w => w.length > 2);
+                        
+                        // Check if at least 2 significant words match (or 1 if title is short)
+                        const minMatches = requestedWords.length <= 2 ? 1 : 2;
+                        const matchCount = requestedWords.filter(w => fileWords.some(fw => fw.includes(w) || w.includes(fw))).length;
+                        
+                        if (matchCount >= minMatches) {
+                            validPackResults.push(pack);
+                        } else {
+                            console.warn(`⚠️ [DB SANITY] Pack file "${pack.file_title || pack.file_path}" does NOT match "${mediaDetails.title}" - EXCLUDING`);
+                            if (pack.info_hash) {
+                                corruptedHashes.push(pack.info_hash.toLowerCase());
+                            }
+                        }
+                    }
+                    
+                    // Delete corrupted cache entries in background
+                    if (corruptedHashes.length > 0 && typeof dbHelper.deletePackFilesCache === 'function') {
+                        console.log(`🗑️ [DB SANITY] Deleting corrupted cache for ${corruptedHashes.length} pack(s)...`);
+                        for (const hash of [...new Set(corruptedHashes)]) {
+                            try {
+                                await dbHelper.deletePackFilesCache(hash);
+                            } catch (e) {
+                                console.warn(`⚠️ Failed to delete cache for ${hash}: ${e.message}`);
+                            }
+                        }
+                    }
+                    
+                    if (validPackResults.length < packResults.length) {
+                        console.log(`💾 [DB SANITY] Filtered pack results: ${validPackResults.length}/${packResults.length} valid`);
+                    }
+                    packResults.length = 0;
+                    packResults.push(...validPackResults);
+                }
+
                 // PRIORITY 2: Search regular torrents (single movies or packs via all_imdb_ids)
                 const regularResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders);
 
