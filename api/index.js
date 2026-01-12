@@ -3682,14 +3682,15 @@ async function getEpisodeAirDate(tmdbId, season, episode, tmdbApiKey) {
     }
 }
 
-// ✅ Check if content is too recent (< 2 days) - don't cache fresh releases
+// ✅ Check if content is too recent (< 4 days) - don't cache fresh releases
+// Using 96h to account for Italy release delays (typically 4-5 days after US)
 function isContentTooRecent(releaseDate) {
     if (!releaseDate) return false; // If no date, allow caching
     try {
         const release = new Date(releaseDate);
         const now = new Date();
         const diffHours = (now - release) / (1000 * 60 * 60);
-        return diffHours < 120; // Less than 48 hours = too recent
+        return diffHours < 96; // Less than 96 hours (4 days) = too recent
     } catch {
         return false;
     }
@@ -7793,7 +7794,8 @@ async function handleStream(type, id, config, workerOrigin) {
             if (isTooRecent) {
                 const release = new Date(contentReleaseDate);
                 const hoursAgo = Math.round((new Date() - release) / (1000 * 60 * 60));
-                console.log(`📅 [CACHE] Content released ${hoursAgo}h ago (${contentReleaseDate}) - too recent for cache`);
+                const daysAgo = (hoursAgo / 24).toFixed(1);
+                console.log(`📅 [CACHE] Content released ${daysAgo}d ago (${hoursAgo}h) - too recent for cache (<4 days)`);
             }
         }
         
