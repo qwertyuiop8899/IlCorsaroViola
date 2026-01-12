@@ -7327,6 +7327,29 @@ async function handleStream(type, id, config, workerOrigin) {
                 const unverifiedMovies = [];
                 const corruptedCacheHashes = new Set(); // 🔧 Track hashes with corrupted cache
 
+                // 🔧 Helper: Normalize filename for comparison (remove quality, year, extension, etc.)
+                const normalizeForMatch = (str) => {
+                    if (!str) return '';
+                    return str
+                        .toLowerCase()
+                        .replace(/\.(mkv|mp4|avi|m2ts|iso|ts|mov|wmv)$/i, '') // Remove extension
+                        .replace(/[\._\-]+/g, ' ')                              // Dots/underscores to spaces
+                        .replace(/\b(1080p|720p|2160p|4k|hdr|dv|bluray|bdrip|bdremux|remux|x264|x265|hevc|avc|ac3|dts|truehd|eng|ita|spa|fre|multi|dual|audio|sub|subs|ita|hdremux|nahom|mircrew|jeddak)\b/gi, '') // Remove quality tags
+                        .replace(/\s+/g, ' ')                                   // Collapse spaces
+                        .trim();
+                };
+
+                // 🔧 Helper: Check if title is contained in filename
+                const titleContainedIn = (filename, title) => {
+                    if (!filename || !title) return false;
+                    const normFile = normalizeForMatch(filename);
+                    const normTitle = normalizeForMatch(title);
+                    // Check if all words of title appear in filename
+                    const titleWords = normTitle.split(' ').filter(w => w.length > 2);
+                    const matchedWords = titleWords.filter(w => normFile.includes(w));
+                    return matchedWords.length >= Math.ceil(titleWords.length * 0.7); // 70% of words match
+                };
+
                 for (const res of filteredResults) {
                     // If it already has fileIndex, it's a known pack file from DB
                     // 🚨 SANITY CHECK: Verify file_title matches the REQUESTED movie!
@@ -7340,17 +7363,17 @@ async function handleStream(type, id, config, workerOrigin) {
                             ...(mediaDetails.titles || [])
                         ].filter(Boolean);
                         
-                        // Match if ANY title matches with >40% similarity
-                        let bestSimilarity = 0;
+                        // 🔧 FIX: Use substring matching instead of Levenshtein
+                        // Levenshtein fails on "The.Godfather.1972.4K..." vs "The Godfather" (20% similarity)
                         for (const title of allTitles) {
-                            const sim = calculateSimilarity(res.file_title, title);
-                            if (sim > bestSimilarity) bestSimilarity = sim;
+                            if (titleContainedIn(res.file_title, title)) {
+                                isClean = true;
+                                break;
+                            }
                         }
 
-                        if (bestSimilarity > 0.4) { // 40% threshold for "Same Movie"
-                            isClean = true;
-                        } else {
-                            console.log(`⚠️ [MOVIE SANITY] Cached file "${res.file_title}" does NOT match any title (best: ${bestSimilarity.toFixed(2)}). Re-verifying pack.`);
+                        if (!isClean) {
+                            console.log(`⚠️ [MOVIE SANITY] Cached file "${res.file_title}" does NOT match any title. Re-verifying pack.`);
                             // 🔧 Mark this hash as having corrupted cache
                             const hash = res.infoHash?.toLowerCase() || res.magnetLink?.match(/btih:([a-fA-F0-9]{40})/i)?.[1]?.toLowerCase();
                             if (hash) corruptedCacheHashes.add(hash);
