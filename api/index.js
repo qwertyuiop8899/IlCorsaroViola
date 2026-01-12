@@ -4272,7 +4272,7 @@ const MAX_CACHE_ENTRIES = 1000;
 const streamCache = new Map();
 const STREAM_CACHE_TTL = 3 * 60 * 60 * 1000; // 3 hours
 const MAX_STREAM_CACHE_ENTRIES = 200;
-const STREAM_CACHE_ENABLED = false; // ⚠️ DISABLED FOR TESTING - set to true for production
+const STREAM_CACHE_ENABLED = true; // ⚠️ DISABLED FOR TESTING - set to true for production
 
 function cleanupCache() {
     const now = Date.now();
