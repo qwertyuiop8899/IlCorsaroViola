@@ -7357,7 +7357,9 @@ async function handleStream(type, id, config, workerOrigin) {
 
                 console.log(`🎬 [MOVIE VERIFY] Checking DB cache for ${unverifiedMovies.length} potential packs...`);
 
-                // 1️⃣ FAST PATH: Check DB Cache for ALL unverified movies
+                // 1️⃣ FAST PATH: Check DB Cache ONLY (no API calls!) for unverified movies
+                // ✅ FIX: Only use cache if TTL is OK, otherwise queue for external verification
+                const PACK_TTL_DAYS = 30;
                 for (const result of unverifiedMovies) {
                     const infoHash = result.infoHash?.toLowerCase() || result.magnetLink?.match(/btih:([a-fA-F0-9]{40})/i)?.[1]?.toLowerCase();
                     if (!infoHash) {
@@ -7365,22 +7367,35 @@ async function handleStream(type, id, config, workerOrigin) {
                         continue;
                     }
 
-                    // Only check cache if size seems like a pack (> 4GB typically, but let's check all large ones)
-                    // Actually, check all. Cache is fast.
                     try {
                         // 🔧 Check if this hash was marked as having corrupted cache
                         const needsForceRefresh = corruptedCacheHashes.has(infoHash);
                         
-                        // If corrupted cache, delete it first before re-fetching
+                        // If corrupted cache, delete it first
                         if (needsForceRefresh && typeof dbHelper.deletePackFilesCache === 'function') {
                             console.log(`🗑️ [MOVIE VERIFY] Deleting corrupted cache for ${infoHash.substring(0, 8)}...`);
                             await dbHelper.deletePackFilesCache(infoHash);
                         }
                         
-                        const cachedFiles = needsForceRefresh ? [] : await dbHelper.getSeriesPackFiles(infoHash);
-                        if (cachedFiles && cachedFiles.length > 0) {
-                            // CACHE HIT: It's a pack (or we have files logged)
-                            // Construct array of ALL possible titles to match against
+                        // 🚀 SPEEDUP: Check DB with TTL BEFORE calling resolveMoviePackFile
+                        // This avoids API calls for expired cache
+                        let hasFreshCache = false;
+                        if (!needsForceRefresh && typeof dbHelper.getPackFiles === 'function') {
+                            const { files: packFiles, expired } = await dbHelper.getPackFiles(infoHash, PACK_TTL_DAYS);
+                            hasFreshCache = packFiles && packFiles.length > 0 && !expired;
+                            if (expired) {
+                                console.log(`⏰ [MOVIE VERIFY] Pack ${infoHash.substring(0, 8)} TTL expired - queue for refresh`);
+                            }
+                        }
+                        
+                        // Fallback to old method for files table
+                        if (!hasFreshCache && !needsForceRefresh) {
+                            const cachedFiles = await dbHelper.getSeriesPackFiles(infoHash);
+                            hasFreshCache = cachedFiles && cachedFiles.length > 0;
+                        }
+                        
+                        if (hasFreshCache) {
+                            // CACHE HIT with valid TTL: Safe to call resolveMoviePackFile (won't make API calls)
                             const candidateTitles = [
                                 mediaDetails.title,
                                 mediaDetails.originalName,
@@ -7392,7 +7407,7 @@ async function handleStream(type, id, config, workerOrigin) {
                                 infoHash,
                                 config,
                                 mediaDetails.imdbId,
-                                uniqueTitles, // ✅ Pass Array of Titles
+                                uniqueTitles,
                                 mediaDetails.year,
                                 dbHelper
                             );
@@ -7407,16 +7422,11 @@ async function handleStream(type, id, config, workerOrigin) {
                                 result.size = formatBytes(fileInfo.fileSize);
                                 newlyVerified.push(result);
                             } else {
-                                // If it's a pack but movie not found -> EXCLUDE
-                                // BUT BE CAREFUL: strict exclusion only if > 1 file.
-                                // resolveMoviePackFile returns null only if Not Found or Error.
-                                // If it was a single file mismatch, it might return null too? 
-                                // Actually resolveMoviePackFile returns valid object for single file if verified.
                                 console.log(`❌ [MOVIE VERIFY] Cache HIT but Movie NOT in pack - EXCLUDING`);
                                 excluded.push(result);
                             }
                         } else {
-                            // CACHE MISS or was cleared: Add to external queue for fresh fetch
+                            // CACHE MISS or TTL expired: Add to external queue for API call
                             needsExternalVerification.push(result);
                         }
                     } catch (e) {
@@ -7424,10 +7434,7 @@ async function handleStream(type, id, config, workerOrigin) {
                     }
                 }
 
-                // 2️⃣ SLOW PATH: External Verification
-                // Only verify if likely a pack (e.g. name contains keywords OR size is huge)
-                // OR just verify top X results to be safe?
-                // Let's verify top X.
+                // 2️⃣ SLOW PATH: External Verification (limited to MAX_MOVIE_VERIFY)
                 const toVerifyExternal = needsExternalVerification.slice(0, MAX_MOVIE_VERIFY);
                 const skipped = needsExternalVerification.slice(MAX_MOVIE_VERIFY);
 
@@ -7497,7 +7504,51 @@ async function handleStream(type, id, config, workerOrigin) {
                 // but likely it IS the movie itself (single file).
                 // We only exclude if we POSITIVELY identified it as a pack missing the file.
                 filteredResults = [...verifiedMovies, ...newlyVerified, ...skipped];
-                console.log(`🎬 [MOVIE VERIFY] Final: ${filteredResults.length} results`);
+                console.log(`🎬 [MOVIE VERIFY] Final: ${filteredResults.length} results (${skipped.length} unverified in background)`);
+                
+                // 🚀 BACKGROUND VERIFICATION for skipped packs (non-blocking)
+                // This pre-fetches pack files for future searches
+                if (skipped.length > 0 && (config.rd_key || config.torbox_key)) {
+                    const candidateTitles = [
+                        mediaDetails.title,
+                        mediaDetails.originalName,
+                        ...(mediaDetails.titles || [])
+                    ].filter(Boolean);
+                    const uniqueTitles = [...new Set(candidateTitles)];
+                    
+                    // Fire and forget - don't await
+                    (async () => {
+                        console.log(`🔄 [MOVIE VERIFY BG] Starting background verification for ${skipped.length} packs...`);
+                        const BG_DELAY_MS = 500; // Slower to avoid rate limits
+                        
+                        for (let i = 0; i < skipped.length; i++) {
+                            const result = skipped[i];
+                            const infoHash = result.infoHash?.toLowerCase();
+                            if (!infoHash) continue;
+                            
+                            // Skip if not likely a pack
+                            const isLikelyPack = packFilesHandler.isSeasonPack(result.title) || (result.sizeInBytes > 4 * 1024 * 1024 * 1024);
+                            if (!isLikelyPack) continue;
+                            
+                            await new Promise(resolve => setTimeout(resolve, BG_DELAY_MS));
+                            
+                            try {
+                                await packFilesHandler.resolveMoviePackFile(
+                                    infoHash,
+                                    config,
+                                    mediaDetails.imdbId,
+                                    uniqueTitles,
+                                    mediaDetails.year,
+                                    dbHelper
+                                );
+                                console.log(`✅ [MOVIE VERIFY BG] Pre-cached pack ${infoHash.substring(0, 8)}`);
+                            } catch (e) {
+                                // Ignore errors in background
+                            }
+                        }
+                        console.log(`✅ [MOVIE VERIFY BG] Background verification complete`);
+                    })().catch(() => {});
+                }
             }
         }
 
