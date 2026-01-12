@@ -5064,17 +5064,29 @@ async function handleStream(type, id, config, workerOrigin) {
     const startTime = Date.now();
 
     // ✅ Stream cache - check if we have recent results for this request
-    // Cache key includes: type, id, debrid services enabled, and db_only flag
+    // Cache key includes: type, id, debrid keys (hashed), proxy URL, and db_only flag
+    // IMPORTANT: Each user's config gets a separate cache to avoid mixing URLs with different keys/proxies
     const useRD = config.use_rd && config.rd_key;
     const useTB = config.use_torbox && config.torbox_key;
     const useAD = config.use_alldebrid && config.ad_key;
-    const streamCacheKey = `stream:${type}:${decodedId}:rd=${useRD}:tb=${useTB}:ad=${useAD}:db=${config.db_only || false}`;
+    
+    // Hash sensitive config parts for cache key (don't store actual keys in memory key)
+    const configHash = (() => {
+        const parts = [];
+        if (config.rd_key) parts.push(`rd:${config.rd_key.substring(0, 8)}`);
+        if (config.torbox_key) parts.push(`tb:${config.torbox_key.substring(0, 8)}`);
+        if (config.ad_key) parts.push(`ad:${config.ad_key.substring(0, 8)}`);
+        if (config.mediaflow_url) parts.push(`mf:${config.mediaflow_url.replace(/https?:\/\//, '').substring(0, 15)}`);
+        return parts.join('|') || 'p2p';
+    })();
+    
+    const streamCacheKey = `stream:${type}:${decodedId}:${configHash}:db=${config.db_only || false}`;
     
     if (STREAM_CACHE_ENABLED && streamCache.has(streamCacheKey)) {
         const cached = streamCache.get(streamCacheKey);
         if (Date.now() - cached.timestamp < STREAM_CACHE_TTL) {
             const cacheAge = Math.round((Date.now() - cached.timestamp) / 1000);
-            console.log(`⚡ [CACHE HIT] Using cached stream results (${cacheAge}s old, ${cached.data.streams?.length || 0} streams)`);
+            console.log(`⚡ [CACHE HIT] ${cached.data.streams?.length || 0} streams | Key: ${configHash} | Age: ${cacheAge}s`);
             // Mark as cached for debug purposes
             const cachedResult = { ...cached.data };
             if (cachedResult._debug) {
@@ -8975,7 +8987,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 console.log(`🧹 [Stream Cache] Cleaned ${entriesToDelete} old entries`);
             }
             streamCache.set(streamCacheKey, { data: result, timestamp: Date.now() });
-            console.log(`💾 [CACHE SAVE] Cached ${streams.length} streams for key: ${type}:${decodedId} (cache size: ${streamCache.size})`);
+            console.log(`💾 [CACHE SAVE] Cached ${streams.length} streams | Key: ${configHash} | ID: ${decodedId} (cache size: ${streamCache.size})`);
         }
 
         return result;
