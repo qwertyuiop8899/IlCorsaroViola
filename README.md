@@ -56,7 +56,6 @@ La caratteristica più potente di IlCorsaroViola è il suo database "vivo":
 |----------|-------|-----------------|
 | Real-Debrid | 👑 | Cache check istantaneo, RD link |
 | Torbox | 📦 | Global + Personal cache |
-| AllDebrid | 🅰️ | Multi-hoster support |
 | P2P | 🧲 | Fallback senza debrid |
 | MediaFlow | 🕵️ | Proxy per condivisione sicura |
 
@@ -109,8 +108,7 @@ Problema risolto: episodio esce oggi, cache salva solo 720p, poi escono versioni
 |---------|-------------|
 | **Real-Debrid API Key** | Chiave API Real-Debrid |
 | **Torbox API Key** | Chiave API Torbox |
-| **AllDebrid API Key** | Chiave API AllDebrid |
-| **MediaFlow Proxy URL** | Proxy per condivisione sicura |
+| **MediaFlow/EasyProxy Proxy URL** | Proxy per condivisione sicura |
 | **Full ITA Mode** | Solo risultati con "ITA" nel titolo |
 | **DB Only Mode** | Solo risultati dal database (velocissimo) |
 | **Use Global Cache** | Usa/contribuisci alla cache condivisa |
