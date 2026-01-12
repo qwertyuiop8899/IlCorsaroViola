@@ -434,7 +434,7 @@ async function updateRdCacheStatus(cacheResults, mediaType = null) {
 }
 
 /**
- * Get cached RD availability for hashes (within 20 days)
+ * Get cached RD availability for hashes (within 10 days)
  * @param {Array} hashes - Array of info hashes
  * @returns {Promise<Object>} Map of hash -> {cached: boolean, lastCheck: Date}
  */
@@ -445,7 +445,7 @@ async function getRdCachedAvailability(hashes) {
   try {
     const lowerHashes = hashes.map(h => h.toLowerCase());
 
-    // Get cached results that are less than 20 days old
+    // Get cached results that are less than 10 days old
     // ✅ NEW: Also fetch file_title for deduplication
     const query = `
       SELECT info_hash, cached_rd, last_cached_check, file_title, size
