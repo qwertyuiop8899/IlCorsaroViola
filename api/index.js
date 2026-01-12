@@ -4315,8 +4315,9 @@ function maybeCleanupCache() {
     }
     
     // Cleanup DB cache every hour (not critical, just housekeeping)
+    // Use movie TTL (18h) for cleanup since it's the longest - series entries expire sooner anyway
     if (USE_DB_CACHE && now - lastDbCacheCleanup > 3600000) {
-        dbHelper.cleanupTorrentSearchCache(GLOBAL_CACHE_TTL_HOURS).catch(err => 
+        dbHelper.cleanupTorrentSearchCache(GLOBAL_CACHE_TTL_MOVIE).catch(err => 
             console.error(`⚠️ [DB Cache Cleanup] Error: ${err.message}`)
         );
         lastDbCacheCleanup = now;
