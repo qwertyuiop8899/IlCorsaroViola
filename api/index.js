@@ -4270,9 +4270,9 @@ const MAX_CACHE_ENTRIES = 1000;
 
 // ✅ Stream results cache - caches final stream results for repeated requests
 const streamCache = new Map();
-const STREAM_CACHE_TTL = 3 * 60 * 60 * 1000; // 3 hours
+const STREAM_CACHE_TTL = 6 * 60 * 60 * 1000; // 8 hours
 const MAX_STREAM_CACHE_ENTRIES = 200;
-const STREAM_CACHE_ENABLED = true; // ⚠️ DISABLED FOR TESTING - set to true for production
+const STREAM_CACHE_ENABLED = true; // ✅ ENABLED - skip all logic for cached searches
 
 function cleanupCache() {
     const now = Date.now();
@@ -7661,11 +7661,11 @@ async function handleStream(type, id, config, workerOrigin) {
                     // ⚠️ instantAvailability is DISABLED by RealDebrid (error_code 37)
                     // Strategy: DB cache + Leviathan-style live check (Add → Status → Delete)
 
-                    // STEP 1: Check DB cache for known cached torrents (< 20 days)
+                    // STEP 1: Check DB cache for known cached torrents (< 10 days)
                     let dbCachedResults = {};
                     if (dbEnabled) {
                         dbCachedResults = await dbHelper.getRdCachedAvailability(hashes);
-                        console.log(`💾 [DB Cache] ${Object.keys(dbCachedResults).length}/${hashes.length} hashes found in cache (< 20 days)`);
+                        console.log(`💾 [DB Cache] ${Object.keys(dbCachedResults).length}/${hashes.length} hashes found in cache (< 10 days)`);
                     }
 
                     // STEP 2: Set DB cached results as base
