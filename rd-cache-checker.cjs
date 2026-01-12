@@ -242,49 +242,71 @@ async function checkCacheSync(items, token, limit = 5) {
  * @param {string} token - RealDebrid API token
  * @param {Object} dbHelper - Database helper module with updateRdCacheStatus function
  */
+// Helper to check if title indicates a pack (trilogia, collection, etc.)
+function isPackTitle(title) {
+    if (!title) return false;
+    return /\b(trilog|saga|collection|collezione|pack|completa|integrale|filmografia)\b/i.test(title);
+}
+
 async function enrichCacheBackground(items, token, dbHelper) {
     if (!items || items.length === 0) return;
 
-    console.log(`🔄 [RD Cache Background] Starting enrichment for ${items.length} hashes...`);
+    console.log(`🔄 [RD Cache Background] Queued ${items.length} hashes for background enrichment...`);
 
-    // ⚠️ DELAYED: Wait 3 seconds before starting to not interfere with main response
+    // ⚠️ TRUE BACKGROUND: Runs AFTER response is sent
+    // Sequential processing with 1 second delay between calls
     setTimeout(() => {
         (async () => {
+            console.log(`🔄 [RD Cache Background] Starting enrichment...`);
             try {
                 const results = [];
+                let skippedAlreadyCached = 0;
 
                 for (const item of items) {
+                    // ✅ CHECK DB FIRST: Skip if already checked
+                    if (dbHelper && typeof dbHelper.getRdCachedAvailability === 'function') {
+                        const existing = await dbHelper.getRdCachedAvailability([item.hash]);
+                        if (existing[item.hash] !== undefined) {
+                            // Already in DB (cached true or false), skip
+                            skippedAlreadyCached++;
+                            continue;
+                        }
+                    }
+                    
+                    // 1 second delay BEFORE each call (RD allows 200/min = 1 every 300ms, but be safe)
+                    await sleep(1000);
+                    
                     const result = await checkSingleHash(item.hash, item.magnet, token);
                     results.push(result);
-
-                    // Longer delay for background processing to be extra gentle on API
-                    await sleep(1000);
-            }
+                }
 
             // Save all results to DB
             if (dbHelper && typeof dbHelper.updateRdCacheStatus === 'function') {
                 const cacheUpdates = results.map(r => ({
                     hash: r.hash,
                     cached: r.cached,
-                    torrent_title: r.torrent_title || null, // ✅ Pass torrent title
-                    size: r.size || null,                   // ✅ Pass total size
-                    file_title: r.file_title || null, // ✅ Include extracted filename
-                    file_size: r.file_size || null // ✅ Provide file_size for DB update
+                    torrent_title: r.torrent_title || null,
+                    size: r.size || null,
+                    file_title: r.file_title || null,
+                    file_size: r.file_size || null
                 }));
 
                 await dbHelper.updateRdCacheStatus(cacheUpdates);
-                console.log(`✅ [RD Cache Background] Enriched ${results.length} hashes in DB`);
+                console.log(`✅ [RD Cache Background] Enriched ${results.length} hashes (skipped ${skippedAlreadyCached} already in DB)`);
             }
             
-            // 🚀 SPEEDUP: Save pack files to DB for instant pack resolution
+            // 🚀 SPEEDUP: Save pack files ONLY if title indicates a pack
             if (dbHelper && typeof dbHelper.insertPackFiles === 'function') {
                 for (const result of results) {
-                    // Only save if it's a pack (>1 video file) and cached
-                    if (result.cached && result.files && result.files.length > 1) {
+                    // ✅ FIXED: Only save if TITLE indicates pack (trilogia, collection, etc.)
+                    // NOT just because it has >1 file (single movies can have .nfo, .srt files)
+                    const isPack = isPackTitle(result.torrent_title) && result.files && result.files.length > 1;
+                    
+                    if (result.cached && isPack) {
                         try {
                             const packFilesData = result.files.map(f => ({
                                 pack_hash: result.hash.toLowerCase(),
-                                imdb_id: null, // Will be filled when matched
+                                imdb_id: null,
                                 file_index: f.id,
                                 file_path: f.path,
                                 file_size: f.bytes || 0
@@ -301,7 +323,7 @@ async function enrichCacheBackground(items, token, dbHelper) {
             console.error(`❌ [RD Cache Background] Error:`, error.message);
         }
         })();
-    }, 3000); // 3 second delay to let response complete first
+    }, 5000); // 5 second delay - runs AFTER response is already sent
 }
 
 // Export for Node.js
