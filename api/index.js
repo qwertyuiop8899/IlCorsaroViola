@@ -5077,7 +5077,7 @@ function isExactMovieMatch(torrentTitle, movieTitle, year) {
         yearMatch[0] === year.toString() ||
         Math.abs(parseInt(yearMatch[0]) - parseInt(year)) <= 1;
 
-    console.log(`${yearMatches ? '✅' : '❌'} Year match for "${torrentTitle}" (${year})`);
+    if (DEBUG_MODE) console.log(`${yearMatches ? '✅' : '❌'} Year match for "${torrentTitle}" (${year})`);
     return yearMatches;
 }
 
@@ -5263,7 +5263,7 @@ async function handleStream(type, id, config, workerOrigin) {
 
         // ✅ GLOBAL CACHE HIT: Load data from cache, skip search
         if (fromGlobalCache && cachedData) {
-            console.log(`⚡ [GLOBAL CACHE] Loading ${cachedData.filteredResults?.length || 0} torrents from cache...`);
+            if (DEBUG_MODE) console.log(`⚡ [GLOBAL CACHE] Loading ${cachedData.filteredResults?.length || 0} torrents from cache...`);
             filteredResults = cachedData.filteredResults || [];
             mediaDetails = cachedData.mediaDetails || null;
             season = cachedData.season || null;
@@ -5273,7 +5273,7 @@ async function handleStream(type, id, config, workerOrigin) {
             searchQueries = cachedData.searchQueries || [];
             italianTitle = cachedData.italianTitle || null;
             originalTitle = cachedData.originalTitle || null;
-            console.log(`⚡ [GLOBAL CACHE] Loaded. User config: ${configHashForLog}`);
+            if (DEBUG_MODE) console.log(`⚡ [GLOBAL CACHE] Loaded. User config: ${configHashForLog}`);
         }
         
         // ✅ Initialize DB connection (needed for debrid cache check even on cache hit)
@@ -5484,7 +5484,7 @@ async function handleStream(type, id, config, workerOrigin) {
             }
 
             mediaDetails.titles = Array.from(allTitles);
-            console.log(`📝 Built titles array: ${JSON.stringify(mediaDetails.titles)}`);
+            if (DEBUG_MODE) console.log(`📝 Built titles array: ${JSON.stringify(mediaDetails.titles)}`);
         }
 
         const displayTitle = Array.isArray(mediaDetails.titles) ? mediaDetails.titles[0] : mediaDetails.title;
@@ -5541,7 +5541,7 @@ async function handleStream(type, id, config, workerOrigin) {
 
                     // 🔥 ALSO search for season packs and complete packs (they don't have file_index)
                     const packResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders);
-                    console.log(`💾 [DB] Found ${packResults.length} additional torrents (packs/complete series)`);
+                    if (DEBUG_MODE) console.log(`💾 [DB] Found ${packResults.length} additional torrents (packs/complete series)`);
 
                     // ✅ FIX: Remove file_index from pack results!
                     // The file_index in torrents table is from the LAST played episode, not the current one.
@@ -5576,7 +5576,7 @@ async function handleStream(type, id, config, workerOrigin) {
                         mediaDetails.imdbId  // Auto-index if found
                     );
                     if (titlePackMatches && titlePackMatches.length > 0) {
-                        console.log(`💾 [DB] Found ${titlePackMatches.length} pack file(s) via Title Search: "${mediaDetails.title}"`);
+                        if (DEBUG_MODE) console.log(`💾 [DB] Found ${titlePackMatches.length} pack file(s) via Title Search: "${mediaDetails.title}"`);
                         packResults.push(...titlePackMatches);
                     }
                 }
@@ -5594,14 +5594,14 @@ async function handleStream(type, id, config, workerOrigin) {
                 if (mediaDetails.title) {
                     const titleMatches = await dbHelper.searchFilesByTitle(mediaDetails.title, selectedProviders, fileSearchOptions);
                     if (titleMatches && titleMatches.length > 0) {
-                        console.log(`💾 [DB] Found ${titleMatches.length} pack files via Reverse Title Search: "${mediaDetails.title}" (${mediaDetails.year})`);
+                        if (DEBUG_MODE) console.log(`💾 [DB] Found ${titleMatches.length} pack files via Reverse Title Search: "${mediaDetails.title}" (${mediaDetails.year})`);
                         packResults.push(...titleMatches);
                     }
                 }
                 if (mediaDetails.originalName && mediaDetails.originalName !== mediaDetails.title) {
                     const origMatches = await dbHelper.searchFilesByTitle(mediaDetails.originalName, selectedProviders, fileSearchOptions);
                     if (origMatches && origMatches.length > 0) {
-                        console.log(`💾 [DB] Found ${origMatches.length} pack files via Reverse Title Search: "${mediaDetails.originalName}" (${mediaDetails.year})`);
+                        if (DEBUG_MODE) console.log(`💾 [DB] Found ${origMatches.length} pack files via Reverse Title Search: "${mediaDetails.originalName}" (${mediaDetails.year})`);
                         packResults.push(...origMatches);
                     }
                 }
@@ -5685,7 +5685,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 for (const result of regularResults) {
                     if (result.all_imdb_ids && Array.isArray(result.all_imdb_ids) && result.all_imdb_ids.length > 1) {
                         if (result.file_index !== null && result.file_index !== undefined) {
-                            console.log(`🔧 [PACK FIX] Removing stale file_index=${result.file_index} from multi-film pack ${result.info_hash?.substring(0,8)}`);
+                            if (DEBUG_MODE) console.log(`🔧 [PACK FIX] Removing stale file_index=${result.file_index} from multi-film pack ${result.info_hash?.substring(0,8)}`);
                             result.file_index = null;
                             result.file_title = null;
                         }
@@ -6084,7 +6084,7 @@ async function handleStream(type, id, config, workerOrigin) {
         };
 
         // Always build queries (needed for enrichment even when skipping live search)
-        console.log(`📝 [Queries] Building search queries for enrichment and live search...`);
+        if (DEBUG_MODE) console.log(`📝 [Queries] Building search queries for enrichment and live search...`);
         if (type === 'series') {
             if (kitsuId) { // Anime search strategy
                 const uniqueQueries = new Set();
@@ -6153,7 +6153,7 @@ async function handleStream(type, id, config, workerOrigin) {
 
         // Rimuovi duplicati e logga
         finalSearchQueries = [...new Set(searchQueries)];
-        console.log(`📚 Final search queries (${finalSearchQueries.length} total):`, finalSearchQueries);
+        if (DEBUG_MODE) console.log(`📚 Final search queries (${finalSearchQueries.length} total):`, finalSearchQueries);
         // --- FINE MODIFICA ---
 
         // --- NUOVA LOGICA DI AGGREGAZIONE E DEDUPLICAZIONE ---
@@ -6184,11 +6184,13 @@ async function handleStream(type, id, config, workerOrigin) {
             if (config.use_mediafusion !== false) enabledExternalAddons.push('mediafusion');
             if (config.use_comet !== false) enabledExternalAddons.push('comet');
         }
-        console.log(`🐞 [DEBUG-EXT] Config:`, JSON.stringify(config));
-        console.log(`🐞 [DEBUG-EXT] Global: ${globalExternalEnabled}, Enabled: ${JSON.stringify(enabledExternalAddons)}`);
+        if (DEBUG_MODE) {
+            console.log(`🐞 [DEBUG-EXT] Config:`, JSON.stringify(config));
+            console.log(`🐞 [DEBUG-EXT] Global: ${globalExternalEnabled}, Enabled: ${JSON.stringify(enabledExternalAddons)}`);
+        }
 
         // ✅ LIVE SEARCH (Tier 3 + Parallel Flows)
-        console.log(`🔍 Starting parallel live search...`);
+        if (DEBUG_MODE) console.log(`🔍 Starting parallel live search...`);
 
         // ✅ Initialize Jackettio if ENV vars are set
         let jackettioInstance = null;
@@ -6477,7 +6479,7 @@ async function handleStream(type, id, config, workerOrigin) {
         }
 
         // 🚀 EXECUTE ALL TASKS PARALLELY
-        console.log(`🚀 Executing ${parallelSearchTasks.length} search tasks in parallel...`);
+        if (DEBUG_MODE) console.log(`🚀 Executing ${parallelSearchTasks.length} search tasks in parallel...`);
         await Promise.allSettled(parallelSearchTasks.map(task => task()));
         console.log(`🏁 All parallel search tasks completed.`);
 
@@ -6492,15 +6494,15 @@ async function handleStream(type, id, config, workerOrigin) {
             ...rawResultsByProvider.Jackettio
         ];
 
-        console.log(`🔎 Found a total of ${allRawResults.length} raw results from all sources. Performing smart deduplication...`);
+        if (DEBUG_MODE) console.log(`🔎 Found a total of ${allRawResults.length} raw results from all sources. Performing smart deduplication...`);
 
         // ✅ ADD DATABASE RESULTS TO RAW RESULTS (if any)
         if (dbResults.length > 0) {
-            console.log(`💾 [DB] Adding ${dbResults.length} database results to aggregation...`);
+            if (DEBUG_MODE) console.log(`💾 [DB] Adding ${dbResults.length} database results to aggregation...`);
 
             // DEBUG: Log all unique hashes BEFORE filtering
             const uniqueHashes = [...new Set(dbResults.map(r => r.info_hash))];
-            console.log(`💾 [DB] Found ${uniqueHashes.length} unique torrents from ${dbResults.length} total DB results`);
+            if (DEBUG_MODE) console.log(`💾 [DB] Found ${uniqueHashes.length} unique torrents from ${dbResults.length} total DB results`);
             // uniqueHashes.forEach(hash => {
             //     const torrents = dbResults.filter(r => r.info_hash === hash);
             //     const firstTorrent = torrents[0];
@@ -6796,7 +6798,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 const magnetLink = `magnet:?xt=urn:btih:${dbResult.info_hash}&dn=${encodeURIComponent(torrentTitle)}`;
 
                 // DEBUG: Log what we're adding
-                console.log(`🔍 [DB ADD] Adding: hash=${dbResult.info_hash.substring(0, 8)}, title="${torrentTitle.substring(0, 50)}...", size=${formatBytes(displaySize || 0)}${finalFileSize ? ' (episode)' : ' (pack)'}, seeders=${dbResult.seeders || 0}`);
+                if (DEBUG_MODE) console.log(`🔍 [DB ADD] Adding: hash=${dbResult.info_hash.substring(0, 8)}, title="${torrentTitle.substring(0, 50)}...", size=${formatBytes(displaySize || 0)}${finalFileSize ? ' (episode)' : ' (pack)'}, seeders=${dbResult.seeders || 0}`);
 
                 // Add to raw results with high priority
                 allRawResults.push({
@@ -6818,12 +6820,12 @@ async function handleStream(type, id, config, workerOrigin) {
                 });
 
                 // DEBUG: Log file info from DB
-                if (finalFileIndex !== undefined && finalFileIndex !== null) {
+                if (DEBUG_MODE && finalFileIndex !== undefined && finalFileIndex !== null) {
                     console.log(`   📁 Has file: fileIndex=${finalFileIndex}, file_title=${fileName}`);
                 }
             }
 
-            console.log(`💾 [DB] Total raw results after DB merge: ${allRawResults.length}`);
+            if (DEBUG_MODE) console.log(`💾 [DB] Total raw results after DB merge: ${allRawResults.length}`);
         }
 
 
@@ -7439,7 +7441,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 // 🎯 SKIP YEAR FILTERING FOR PACKS (they contain multiple movies with different years)
                 // Packs are identified by having a fileIndex (from pack_files table)
                 if (result.fileIndex !== null && result.fileIndex !== undefined) {
-                    console.log(`🎬 [Pack] SKIP year filter for pack: ${torrentTitle.substring(0, 60)}... (fileIndex=${result.fileIndex})`);
+                    if (DEBUG_MODE) console.log(`🎬 [Pack] SKIP year filter for pack: ${torrentTitle.substring(0, 60)}... (fileIndex=${result.fileIndex})`);
                     return true; // Always keep packs, they're already filtered by IMDb ID in DB query
                 }
 
@@ -7569,7 +7571,7 @@ async function handleStream(type, id, config, workerOrigin) {
                     }
                 }
                 
-                console.log(`🎬 [MOVIE VERIFY] Found ${actualPacks.length} actual packs (${unverifiedMovies.length - actualPacks.length} single movies skipped)`);
+                if (DEBUG_MODE) console.log(`🎬 [MOVIE VERIFY] Found ${actualPacks.length} actual packs (${unverifiedMovies.length - actualPacks.length} single movies skipped)`);
 
                 // 1️⃣ FAST PATH: Check DB Cache ONLY for actual packs
                 const PACK_TTL_DAYS = 30;
@@ -7586,7 +7588,7 @@ async function handleStream(type, id, config, workerOrigin) {
                         
                         // If corrupted cache, delete it first
                         if (needsForceRefresh && typeof dbHelper.deletePackFilesCache === 'function') {
-                            console.log(`🗑️ [MOVIE VERIFY] Deleting corrupted cache for ${infoHash.substring(0, 8)}...`);
+                            if (DEBUG_MODE) console.log(`🗑️ [MOVIE VERIFY] Deleting corrupted cache for ${infoHash.substring(0, 8)}...`);
                             await dbHelper.deletePackFilesCache(infoHash);
                         }
                         
@@ -7596,7 +7598,7 @@ async function handleStream(type, id, config, workerOrigin) {
                         if (!needsForceRefresh && typeof dbHelper.getPackFiles === 'function') {
                             const { files: packFiles, expired } = await dbHelper.getPackFiles(infoHash, PACK_TTL_DAYS);
                             hasFreshCache = packFiles && packFiles.length > 0 && !expired;
-                            if (expired) {
+                            if (expired && DEBUG_MODE) {
                                 console.log(`⏰ [MOVIE VERIFY] Pack ${infoHash.substring(0, 8)} TTL expired - queue for refresh`);
                             }
                         }
@@ -7626,7 +7628,7 @@ async function handleStream(type, id, config, workerOrigin) {
                             );
 
                             if (fileInfo) {
-                                console.log(`✅ [MOVIE VERIFY] Cache HIT & Verified: ${fileInfo.fileName}`);
+                                if (DEBUG_MODE) console.log(`✅ [MOVIE VERIFY] Cache HIT & Verified: ${fileInfo.fileName}`);
                                 result.packSize = fileInfo.totalPackSize || result.sizeInBytes || 0;
                                 result.file_size = fileInfo.fileSize;
                                 result.fileIndex = fileInfo.fileIndex;
@@ -7635,7 +7637,7 @@ async function handleStream(type, id, config, workerOrigin) {
                                 result.size = formatBytes(fileInfo.fileSize);
                                 newlyVerified.push(result);
                             } else {
-                                console.log(`❌ [MOVIE VERIFY] Cache HIT but Movie NOT in pack - EXCLUDING`);
+                                if (DEBUG_MODE) console.log(`❌ [MOVIE VERIFY] Cache HIT but Movie NOT in pack - EXCLUDING`);
                                 excluded.push(result);
                             }
                         } else {
@@ -7651,7 +7653,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 const toVerifyExternal = needsExternalVerification.slice(0, MAX_MOVIE_VERIFY);
                 const skipped = needsExternalVerification.slice(MAX_MOVIE_VERIFY);
 
-                console.log(`🎬 [MOVIE VERIFY] External Check: ${toVerifyExternal.length} movies (Skipped: ${skipped.length})`);
+                if (DEBUG_MODE) console.log(`🎬 [MOVIE VERIFY] External Check: ${toVerifyExternal.length} movies (Skipped: ${skipped.length})`);
 
                 for (let i = 0; i < toVerifyExternal.length; i++) {
                     const result = toVerifyExternal[i];
@@ -7667,7 +7669,7 @@ async function handleStream(type, id, config, workerOrigin) {
                     }
 
                     if (i > 0) await new Promise(resolve => setTimeout(resolve, DELAY_MS));
-                    console.log(`🎬 [MOVIE VERIFY] External (${i + 1}/${toVerifyExternal.length}) Checking "${result.title.substring(0, 50)}..."`);
+                    if (DEBUG_MODE) console.log(`🎬 [MOVIE VERIFY] External (${i + 1}/${toVerifyExternal.length}) Checking "${result.title.substring(0, 50)}..."`);
 
                     try {
                         // Construct array of ALL possible titles to match against
@@ -7679,7 +7681,7 @@ async function handleStream(type, id, config, workerOrigin) {
                         // Dedup
                         const uniqueTitles = [...new Set(candidateTitles)];
 
-                        console.log(`🎬 [MOVIE VERIFY] Resolving pack using titles: ${JSON.stringify(uniqueTitles)}`);
+                        if (DEBUG_MODE) console.log(`🎬 [MOVIE VERIFY] Resolving pack using titles: ${JSON.stringify(uniqueTitles)}`);
 
                         const fileInfo = await packFilesHandler.resolveMoviePackFile(
                             infoHash,
@@ -7691,7 +7693,7 @@ async function handleStream(type, id, config, workerOrigin) {
                         );
 
                         if (fileInfo) {
-                            console.log(`✅ [MOVIE VERIFY] Verified: ${fileInfo.fileName}`);
+                            if (DEBUG_MODE) console.log(`✅ [MOVIE VERIFY] Verified: ${fileInfo.fileName}`);
                             result.packSize = fileInfo.totalPackSize || result.sizeInBytes || 0;
                             result.file_size = fileInfo.fileSize;
                             result.fileIndex = fileInfo.fileIndex;
@@ -7702,7 +7704,7 @@ async function handleStream(type, id, config, workerOrigin) {
                         } else {
                             // If resolve returns null, it means it's a pack but movie NOT found.
                             // OR fetch failed.
-                            console.log(`❌ [MOVIE VERIFY] Movie NOT in pack - EXCLUDING`);
+                            if (DEBUG_MODE) console.log(`❌ [MOVIE VERIFY] Movie NOT in pack - EXCLUDING`);
                             excluded.push(result);
                         }
                     } catch (err) {
@@ -7717,7 +7719,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 // but likely it IS the movie itself (single file).
                 // We only exclude if we POSITIVELY identified it as a pack missing the file.
                 filteredResults = [...verifiedMovies, ...newlyVerified, ...skipped];
-                console.log(`🎬 [MOVIE VERIFY] Final: ${filteredResults.length} results (${skipped.length} unverified in background)`);
+                if (DEBUG_MODE) console.log(`🎬 [MOVIE VERIFY] Final: ${filteredResults.length} results (${skipped.length} unverified in background)`);
                 
                 // 🚀 BACKGROUND VERIFICATION for skipped packs (non-blocking)
                 // This pre-fetches pack files for future searches
@@ -8022,7 +8024,7 @@ async function handleStream(type, id, config, workerOrigin) {
 
                         if (userCacheToSave.length > 0) {
                             await dbHelper.updateRdCacheStatus(userCacheToSave, type);
-                            console.log(`💾 [GLOBAL CACHE] Saved ${userCacheToSave.length} RD personal torrents to DB (now available for all users)`);
+                            if (DEBUG_MODE) console.log(`💾 [GLOBAL CACHE] Saved ${userCacheToSave.length} RD personal torrents to DB (now available for all users)`);
                         }
                     }
 
@@ -8069,12 +8071,12 @@ async function handleStream(type, id, config, workerOrigin) {
                             const syncLimit = Math.max(0, 5 - dbCachedCount);
                             const syncItems = itemsToCheck.slice(0, syncLimit);
 
-                            console.log(`🔄 [RD Cache] ${dbCachedCount} already in DB cache, checking ${syncItems.length} more (target: 5 total)`);
+                            if (DEBUG_MODE) console.log(`🔄 [RD Cache] ${dbCachedCount} already in DB cache, checking ${syncItems.length} more (target: 5 total)`);
 
                             if (syncItems.length > 0) {
                                 // 🚀 Fire-and-forget: Check RD cache in background (add/delete is slow!)
                                 // Users won't see "⚡" immediately for NEW items, but searching again instantly will show it.
-                                console.log(`⏩ [RD Cache] Running background check for ${syncItems.length} items...`);
+                                if (DEBUG_MODE) console.log(`⏩ [RD Cache] Running background check for ${syncItems.length} items...`);
                                 rdCacheChecker.checkCacheSync(syncItems, config.rd_key, syncLimit)
                                     .then(async (liveCheckResults) => {
                                         // Save results to DB
@@ -8104,14 +8106,14 @@ async function handleStream(type, id, config, workerOrigin) {
                             const asyncItems = itemsToCheck.slice(syncLimit);
                             if (asyncItems.length > 0) {
                                 rdCacheChecker.enrichCacheBackground(asyncItems, config.rd_key, dbHelper);
-                                console.log(`🔄 [RD Background] Local enrichment for ${asyncItems.length} additional hashes`);
+                                if (DEBUG_MODE) console.log(`🔄 [RD Background] Local enrichment for ${asyncItems.length} additional hashes`);
                             }
                         }
                     }
 
                     // ✅ ONE-TIME: Enrich file_title for cached items that never had it checked
                     if (needsFileTitleEnrichment.length > 0 && config.rd_key) {
-                        console.log(`📝 [File Title] Background enrichment for ${needsFileTitleEnrichment.length} cached items missing file_title...`);
+                        if (DEBUG_MODE) console.log(`📝 [File Title] Background enrichment for ${needsFileTitleEnrichment.length} cached items missing file_title...`);
                         const enrichItems = needsFileTitleEnrichment.map(hash => {
                             const result = filteredResults.find(r => r.infoHash?.toLowerCase() === hash);
                             return result ? { hash, magnet: result.magnetLink } : null;
@@ -8180,7 +8182,7 @@ async function handleStream(type, id, config, workerOrigin) {
                     /\b(19[2-9]\d|20[0-3]\d)-(19[2-9]\d|20[0-3]\d)\b/.test(result.title);
 
                 if (isPack) {
-                    console.log(`📦 [Pack] Detected pack: "${result.title}"`);
+                    if (DEBUG_MODE) console.log(`📦 [Pack] Detected pack: "${result.title}"`);
 
                     // Try to get torrent info to access file list
                     // We'll do this lazily when user clicks, but we can mark it as a pack
@@ -8235,9 +8237,9 @@ async function handleStream(type, id, config, workerOrigin) {
                     if (type === 'movie') {
                         if (!result.file_title && rdCacheData?.file_title) {
                             result.file_title = rdCacheData.file_title;
-                            console.log(`📄 [RD] Using cached file_title (movie): ${result.file_title.substring(0, 40)}...`);
+                            if (DEBUG_MODE) console.log(`📄 [RD] Using cached file_title (movie): ${result.file_title.substring(0, 40)}...`);
                         } else if (result.file_title) {
-                            console.log(`📄 [RD] Using DB file_title (movie): ${result.file_title.substring(0, 40)}...`);
+                            if (DEBUG_MODE) console.log(`📄 [RD] Using DB file_title (movie): ${result.file_title.substring(0, 40)}...`);
                         }
                     }
 
@@ -8268,16 +8270,16 @@ async function handleStream(type, id, config, workerOrigin) {
                     // 3. No cache available
 
                     // DEBUG: Log cache lookup
-                    if (rdCacheData) {
+                    if (DEBUG_MODE && rdCacheData) {
                         console.log(`🔍 [Cache Debug] ${infoHashLower.substring(0, 8)}: cached=${rdCacheData.cached}, file_title=${rdCacheData.file_title?.substring(0, 30) || 'null'}`);
                     }
 
                     if (rdCacheData?.cached) {
                         cacheType = 'global';
-                        console.log(`👑 ⚡ RD GLOBAL cache (DB): ${result.title.substring(0, 50)}...`);
+                        if (DEBUG_MODE) console.log(`👑 ⚡ RD GLOBAL cache (DB): ${result.title.substring(0, 50)}...`);
                     } else if (rdUserTorrent && rdUserTorrent.status === 'downloaded') {
                         cacheType = 'personal';
-                        console.log(`👑 👤 Found in RD PERSONAL cache: ${result.title}`);
+                        if (DEBUG_MODE) console.log(`👑 👤 Found in RD PERSONAL cache: ${result.title}`);
                     } else {
                         cacheType = 'none';
                     }
@@ -8488,19 +8490,19 @@ async function handleStream(type, id, config, workerOrigin) {
                     // Include pack/fileIndex for movie packs to select correct file
                     if (type === 'series' && season && episode) {
                         streamUrl = `${workerOrigin}/torbox-stream/${encodedConfig}/${encodeURIComponent(result.magnetLink)}/${season}/${episode}`;
-                        console.log(`📦 [Torbox] Stream URL with S${season}E${episode}: ${result.title}`);
+                        if (DEBUG_MODE) console.log(`📦 [Torbox] Stream URL with S${season}E${episode}: ${result.title}`);
                     } else if (type === 'movie' && result.fileIndex !== undefined && result.fileIndex !== null) {
                         // Movie pack: pass filename for matching (since Torbox IDs differ from RD)
                         const packFileName = result.file_title || result.file_path || '';
                         const encodedFileName = encodeURIComponent(packFileName.split('/').pop()); // Just the filename
                         streamUrl = `${workerOrigin}/torbox-stream/${encodedConfig}/${encodeURIComponent(result.magnetLink)}/packfile/${encodedFileName}`;
-                        console.log(`📦 [Torbox] Stream URL with pack filename "${packFileName}": ${result.title}`);
+                        if (DEBUG_MODE) console.log(`📦 [Torbox] Stream URL with pack filename "${packFileName}": ${result.title}`);
                     } else if (type === 'movie' && result.packSize && result.packSize > 5 * 1024 * 1024 * 1024) {
                         // ✅ Movie pack WITHOUT verified fileIndex - pass title+year for runtime resolution
                         const movieTitle = encodeURIComponent(mediaDetails.title || '');
                         const movieYear = mediaDetails.year || '';
                         streamUrl = `${workerOrigin}/torbox-stream/${encodedConfig}/${encodeURIComponent(result.magnetLink)}/movie/${movieTitle}/${movieYear}`;
-                        console.log(`📦 [Torbox] Stream URL with movie title match: ${result.title}`);
+                        if (DEBUG_MODE) console.log(`📦 [Torbox] Stream URL with movie title match: ${result.title}`);
                     } else {
                         streamUrl = `${workerOrigin}/torbox-stream/${encodedConfig}/${encodeURIComponent(result.magnetLink)}`;
                     }
@@ -8508,10 +8510,10 @@ async function handleStream(type, id, config, workerOrigin) {
                     // ✅ EXACT TORRENTIO LOGIC: If Torbox says cached, show as cached
                     if (torboxCacheData?.cached) {
                         cacheType = 'global';
-                        console.log(`📦 ⚡ Torbox GLOBAL cache available: ${result.title}`);
+                        if (DEBUG_MODE) console.log(`📦 ⚡ Torbox GLOBAL cache available: ${result.title}`);
                     } else if (torboxUserTorrent && torboxUserTorrent.download_finished === true) {
                         cacheType = 'personal';
-                        console.log(`📦 👤 Found in Torbox PERSONAL cache: ${result.title}`);
+                        if (DEBUG_MODE) console.log(`📦 👤 Found in Torbox PERSONAL cache: ${result.title}`);
                     } else {
                         cacheType = 'none';
                     }
@@ -9170,11 +9172,13 @@ async function handleStream(type, id, config, workerOrigin) {
         console.log(`⚡ ${cachedCount} cached streams available for instant playback`);
 
         // 🔥 ENRICHMENT: VPS webhook with load balancing (must complete BEFORE returning response)
-        console.log(`🔍 [Background Check] dbEnabled=${dbEnabled}, mediaDetails=${!!mediaDetails}, tmdbId=${mediaDetails?.tmdbId}, imdbId=${mediaDetails?.imdbId}, kitsuId=${mediaDetails?.kitsuId}`);
+        if (DEBUG_MODE) console.log(`🔍 [Background Check] dbEnabled=${dbEnabled}, mediaDetails=${!!mediaDetails}, tmdbId=${mediaDetails?.tmdbId}, imdbId=${mediaDetails?.imdbId}, kitsuId=${mediaDetails?.kitsuId}`);
 
         if (dbEnabled && mediaDetails && (mediaDetails.tmdbId || mediaDetails.imdbId || mediaDetails.kitsuId)) {
-            console.log(`🔍 [Enrichment] Preparing webhook for "${mediaDetails.title}"`);
-            console.log(`🔍 [Enrichment Titles] Italian: "${italianTitle || 'N/A'}", Original: "${originalTitle || 'N/A'}", English: "${mediaDetails.title}"`);
+            if (DEBUG_MODE) {
+                console.log(`🔍 [Enrichment] Preparing webhook for "${mediaDetails.title}"`);
+                console.log(`🔍 [Enrichment Titles] Italian: "${italianTitle || 'N/A'}", Original: "${originalTitle || 'N/A'}", English: "${mediaDetails.title}"`);
+            }
 
             // 🔄 Load balancing: Round-robin between VPS1 and VPS2
             const enrichmentServers = [
@@ -9196,7 +9200,7 @@ async function handleStream(type, id, config, workerOrigin) {
 
             const enrichmentApiKey = process.env.ENRICHMENT_API_KEY || 'change-me-in-production';
 
-            console.log(`🚀 [Webhook] Calling VPS enrichment (server ${global.enrichmentServerIndex === 0 ? 2 : 1}): ${enrichmentUrl}`);
+            if (DEBUG_MODE) console.log(`🚀 [Webhook] Calling VPS enrichment (server ${global.enrichmentServerIndex === 0 ? 2 : 1}): ${enrichmentUrl}`);
 
             try {
                 const webhookResponse = await fetch(enrichmentUrl, {
@@ -9218,7 +9222,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 });
 
                 if (webhookResponse.ok) {
-                    console.log(`✅ [Webhook] Enrichment queued (${webhookResponse.status})`);
+                    if (DEBUG_MODE) console.log(`✅ [Webhook] Enrichment queued (${webhookResponse.status})`);
                 } else {
                     console.warn(`⚠️ [Webhook] Failed: ${webhookResponse.status}`);
                 }
@@ -9226,7 +9230,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 console.warn(`⚠️ [Webhook] Unreachable:`, err.message);
             }
         } else {
-            console.log(`⏭️  [Background] Enrichment skipped (dbEnabled=${dbEnabled}, hasMediaDetails=${!!mediaDetails}, hasIds=${!!(mediaDetails?.tmdbId || mediaDetails?.imdbId || mediaDetails?.kitsuId)})`);
+            if (DEBUG_MODE) console.log(`⏭️  [Background] Enrichment skipped (dbEnabled=${dbEnabled}, hasMediaDetails=${!!mediaDetails}, hasIds=${!!(mediaDetails?.tmdbId || mediaDetails?.imdbId || mediaDetails?.kitsuId)})`);
         }
 
         // ✅ Cache successful results for faster repeated searches
