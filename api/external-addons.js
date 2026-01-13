@@ -5,6 +5,9 @@
  * Gestisce chiamate parallele, normalizzazione e deduplicazione.
  */
 
+// ✅ VERBOSE LOGGING - configurabile via ENV
+const DEBUG_MODE = process.env.DEBUG_MODE === 'true';
+
 // ============================================================================
 // CONFIGURATION - URL completi degli addon esterni con configurazione base64
 // ============================================================================
@@ -224,8 +227,8 @@ function normalizeExternalStream(stream, addonKey) {
 
     const infoHash = extractInfoHash(stream);
 
-    // Debug: log infoHash extraction result
-    console.log(`🔍 [Normalize] infoHash=${infoHash ? infoHash.substring(0, 8) + '...' : 'NULL'}, url=${stream.url?.substring(0, 60) || 'none'}...`);
+    // Debug: log infoHash extraction result (solo in verbose mode)
+    if (DEBUG_MODE) console.log(`🔍 [Normalize] infoHash=${infoHash ? infoHash.substring(0, 8) + '...' : 'NULL'}, url=${stream.url?.substring(0, 60) || 'none'}...`);
 
     const filename = extractFilename(stream);
     const quality = extractQuality(stream.name || filename || text);
