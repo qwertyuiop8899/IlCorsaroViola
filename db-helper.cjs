@@ -308,7 +308,7 @@ async function insertTorrent(torrent) {
     );
 
     if (checkResult.rows.length > 0) {
-      console.log(`💾 [DB] Torrent ${torrent.infoHash} already exists, skipping`);
+      if (DEBUG_MODE) console.log(`💾 [DB] Torrent ${torrent.infoHash} already exists, skipping`);
       await client.query('ROLLBACK');
       return false;
     }
@@ -332,7 +332,7 @@ async function insertTorrent(torrent) {
     );
 
     await client.query('COMMIT');
-    console.log(`✅ [DB] Inserted torrent: ${torrent.title.substring(0, 60)}...`);
+    if (DEBUG_MODE) console.log(`✅ [DB] Inserted torrent: ${torrent.title.substring(0, 60)}...`);
     return true;
 
   } catch (error) {
@@ -430,9 +430,9 @@ async function updateRdCacheStatus(cacheResults, mediaType = null) {
     }
 
     if (skipped > 0) {
-      console.log(`⏭️  [DB] Skipped ${skipped} useless placeholder(s)`);
+      if (DEBUG_MODE) console.log(`⏭️  [DB] Skipped ${skipped} useless placeholder(s)`);
     }
-    console.log(`✅ [DB] Updated RD cache status for ${updated} torrents`);
+    if (DEBUG_MODE) console.log(`✅ [DB] Updated RD cache status for ${updated} torrents`);
     return updated;
 
   } catch (error) {
@@ -477,7 +477,7 @@ async function getRdCachedAvailability(hashes) {
       };
     });
 
-    console.log(`💾 [DB] Found ${result.rows.length}/${hashes.length} hashes with valid RD cache (< 10 days)`);
+    if (DEBUG_MODE) console.log(`💾 [DB] Found ${result.rows.length}/${hashes.length} hashes with valid RD cache (< 10 days)`);
 
     // Debug: Show which hashes are cached
     const cachedTrue = result.rows.filter(r => r.cached_rd === true).length;
@@ -511,7 +511,7 @@ async function refreshRdCacheTimestamp(infoHash) {
     const result = await pool.query(query, [infoHash.toLowerCase()]);
 
     if (result.rowCount > 0) {
-      console.log(`🔄 [DB] Refreshed RD cache timestamp for ${infoHash.substring(0, 8)}... (+10 days)`);
+      if (DEBUG_MODE) console.log(`🔄 [DB] Refreshed RD cache timestamp for ${infoHash.substring(0, 8)}... (+10 days)`);
     }
     return result.rowCount > 0;
   } catch (error) {
@@ -593,7 +593,7 @@ async function batchInsertTorrents(torrents) {
       }
     }
 
-    console.log(`✅ [DB] Batch upsert: ${inserted}/${torrents.length} torrents inserted/updated`);
+    if (DEBUG_MODE) console.log(`✅ [DB] Batch upsert: ${inserted}/${torrents.length} torrents inserted/updated`);
     return inserted;
 
   } catch (error) {
@@ -614,15 +614,15 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
   if (!pool) throw new Error('Database not initialized');
 
   try {
-    console.log(`💾 [DB updateTorrentFileInfo] Input: hash=${infoHash}, fileIndex=${fileIndex}, size=${fileSize}, filePath=${filePath}, episodeInfo=`, episodeInfo);
+    if (DEBUG_MODE) console.log(`💾 [DB updateTorrentFileInfo] Input: hash=${infoHash}, fileIndex=${fileIndex}, size=${fileSize}, filePath=${filePath}, episodeInfo=`, episodeInfo);
 
     // Extract just the filename from path
     const fileName = filePath.split('/').pop().split('\\').pop();
-    console.log(`💾 [DB updateTorrentFileInfo] Extracted filename: ${fileName}`);
+    if (DEBUG_MODE) console.log(`💾 [DB updateTorrentFileInfo] Extracted filename: ${fileName}`);
 
     // If episodeInfo is provided, save to 'files' table (for series episodes)
     if (episodeInfo && episodeInfo.imdbId && episodeInfo.season && episodeInfo.episode) {
-      console.log(`💾 [DB] Saving episode file: ${episodeInfo.imdbId} S${episodeInfo.season}E${episodeInfo.episode}`);
+      if (DEBUG_MODE) console.log(`💾 [DB] Saving episode file: ${episodeInfo.imdbId} S${episodeInfo.season}E${episodeInfo.episode}`);
 
       // Check if file already exists
       const checkQuery = `
@@ -660,7 +660,7 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
           episodeInfo.episode,
           fileSize // $7
         ]);
-        console.log(`✅ [DB] Updated file in 'files' table: ${fileName} (rowCount=${res.rowCount})`);
+        if (DEBUG_MODE) console.log(`✅ [DB] Updated file in 'files' table: ${fileName} (rowCount=${res.rowCount})`);
         return res.rowCount > 0;
       } else {
         // Check if this (hash, fileIndex) combo exists for a DIFFERENT episode
@@ -672,7 +672,7 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
         if (conflictCheck.rowCount > 0) {
           // This fileIndex is already used for a different episode - skip to avoid conflict
           const existing = conflictCheck.rows[0];
-          console.log(`⚠️ [DB] FileIndex ${fileIndex} already used for S${existing.imdb_season}E${existing.imdb_episode}, skipping S${episodeInfo.season}E${episodeInfo.episode}`);
+          if (DEBUG_MODE) console.log(`⚠️ [DB] FileIndex ${fileIndex} already used for S${existing.imdb_season}E${existing.imdb_episode}, skipping S${episodeInfo.season}E${episodeInfo.episode}`);
           return false;
         }
 
@@ -697,7 +697,7 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
           fileSize // $7
         ]);
 
-        console.log(`✅ [DB] Upserted file into 'files' table: ${fileName}`);
+        if (DEBUG_MODE) console.log(`✅ [DB] Upserted file into 'files' table: ${fileName}`);
         return true;
       }
     } else {
@@ -710,7 +710,7 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
       `;
 
       const res = await pool.query(query, [fileIndex, fileName, infoHash.toLowerCase()]);
-      console.log(`✅ [DB] Updated torrents table: ${fileName} (rowCount=${res.rowCount})`);
+      if (DEBUG_MODE) console.log(`✅ [DB] Updated torrents table: ${fileName} (rowCount=${res.rowCount})`);
 
       return res.rowCount > 0;
     }
@@ -729,7 +729,7 @@ async function deleteFileInfo(infoHash) {
   try {
     const query = `DELETE FROM files WHERE info_hash = $1`;
     const res = await pool.query(query, [infoHash.toLowerCase()]);
-    console.log(`✅ [DB] Deleted ${res.rowCount} file entries for hash ${infoHash}`);
+    if (DEBUG_MODE) console.log(`✅ [DB] Deleted ${res.rowCount} file entries for hash ${infoHash}`);
     return res.rowCount;
   } catch (error) {
     console.error(`❌ [DB] Error deleting file info:`, error.message);
@@ -757,10 +757,10 @@ async function updateRdLinkIndex(infoHash, fileIndex, rdLinkIndex) {
     const res = await pool.query(query, [infoHash.toLowerCase(), fileIndex, rdLinkIndex]);
     
     if (res.rowCount > 0) {
-      console.log(`✅ [DB] Saved rd_link_index=${rdLinkIndex} for ${infoHash.substring(0,8)}... file_index=${fileIndex}`);
+      if (DEBUG_MODE) console.log(`✅ [DB] Saved rd_link_index=${rdLinkIndex} for ${infoHash.substring(0,8)}... file_index=${fileIndex}`);
       return true;
     } else {
-      console.warn(`⚠️ [DB] No file found to update rd_link_index for ${infoHash.substring(0,8)}... file_index=${fileIndex}`);
+      if (DEBUG_MODE) console.warn(`⚠️ [DB] No file found to update rd_link_index for ${infoHash.substring(0,8)}... file_index=${fileIndex}`);
       return false;
     }
   } catch (error) {
@@ -791,7 +791,7 @@ async function updateRdLinkIndexForPack(infoHash, fileId, rdLinkIndex, filename)
     const res = await pool.query(query, [infoHash.toLowerCase(), fileId, rdLinkIndex]);
     
     if (res.rowCount > 0) {
-      console.log(`✅ [DB] Pack: Saved rd_link_index=${rdLinkIndex} for file_id=${fileId} (${filename})`);
+      if (DEBUG_MODE) console.log(`✅ [DB] Pack: Saved rd_link_index=${rdLinkIndex} for file_id=${fileId} (${filename})`);
       return true;
     } else {
       // Try to match by filename if file_index doesn't match
@@ -802,7 +802,7 @@ async function updateRdLinkIndexForPack(infoHash, fileId, rdLinkIndex, filename)
       `;
       const filenameRes = await pool.query(filenameQuery, [infoHash.toLowerCase(), rdLinkIndex, filename]);
       if (filenameRes.rowCount > 0) {
-        console.log(`✅ [DB] Pack: Saved rd_link_index=${rdLinkIndex} for ${filename} (by filename match)`);
+        if (DEBUG_MODE) console.log(`✅ [DB] Pack: Saved rd_link_index=${rdLinkIndex} for ${filename} (by filename match)`);
         return true;
       }
       return false;
