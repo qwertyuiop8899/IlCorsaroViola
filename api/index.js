@@ -8215,6 +8215,12 @@ async function handleStream(type, id, config, workerOrigin) {
 
         for (const result of filteredResults) {
             try {
+                // ✅ FIX: Skip results without magnetLink to prevent /undefined/ in URLs
+                if (!result.magnetLink) {
+                    console.warn(`⚠️ [Stream] Skipping result without magnetLink: ${result.title?.substring(0, 50)}...`);
+                    continue;
+                }
+                
                 const qualityDisplay = result.quality ? result.quality.toUpperCase() : 'Unknown';
                 const qualitySymbol = getQualitySymbol(qualityDisplay);
                 const { icon: languageIcon } = getLanguageInfo(result.title, italianTitle);
