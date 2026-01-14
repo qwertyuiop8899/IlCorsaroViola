@@ -28,7 +28,12 @@ const TRIGGER_API_KEY = process.env.ENRICHMENT_API_KEY || 'change-me-in-producti
 
 const triggerSeederUpdate = async (results) => {
     try {
-        if (!TRIGGER_SEEDER_UPDATE_URL) return; // Disable if not configured
+        if (!TRIGGER_SEEDER_UPDATE_URL) {
+            if (process.env.DEBUG_MODE === 'true') {
+                console.warn('⚠️ [SEEDER] TRIGGER_SEEDER_UPDATE_URL not configured. Skipping seeder update.');
+            }
+            return;
+        }
         if (!results || results.length === 0) return;
 
         // Extract hashes
@@ -41,6 +46,10 @@ const triggerSeederUpdate = async (results) => {
         // Unique hashes
         const uniqueHashes = [...new Set(hashes)];
 
+        if (process.env.DEBUG_MODE === 'true') {
+            console.log(`🚀 [SEEDER] Triggering update for ${uniqueHashes.length} torrents to ${TRIGGER_SEEDER_UPDATE_URL}`);
+        }
+
         // Fire and forget (don't await)
         fetch(TRIGGER_SEEDER_UPDATE_URL, {
             method: 'POST',
@@ -51,7 +60,9 @@ const triggerSeederUpdate = async (results) => {
             body: JSON.stringify({ hashes: uniqueHashes })
         }).catch(err => {
             // Silently fail if service makes connection errors (it might be down)
-            // console.warn('⚠️ Seeder update trigger failed:', err.message);
+            if (process.env.DEBUG_MODE === 'true') {
+                console.warn('⚠️ [SEEDER] Update trigger failed:', err.message);
+            }
         });
 
     } catch (e) {
