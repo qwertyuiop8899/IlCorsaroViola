@@ -20,6 +20,15 @@ jobs:
           project-name: ${{ secrets.PROJECT_NAME }}
           env: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
-            SEEDER_UPDATE_URL=${{ secrets.SEEDER_UPDATE_URL }}
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            DB_USER=${{ secrets.DB_USER }}
+            DEBUG_MODE=${{ secrets.DEBUG_MODE }}
             ENRICHMENT_API_KEY=${{ secrets.ENRICHMENT_API_KEY }}
-            DEBUG_MODE=false
+            ENRICHMENT_PORT=${{ secrets.ENRICHMENT_PORT }}
+            ENRICHMENT_SERVER_URL=${{ secrets.ENRICHMENT_SERVER_URL }}
+            ENRICHMENT_SERVER_URL_2=${{ secrets.ENRICHMENT_SERVER_URL_2 }}
+            SEEDER_UPDATE_URL=${{ secrets.SEEDER_UPDATE_URL }}
+            TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}
