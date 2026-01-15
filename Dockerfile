@@ -1,5 +1,5 @@
 # 🐳 Dockerfile per HuggingFace Spaces
-# Clona direttamente da GitHub - non serve copiare file manualmente
+# Clona direttamente da GitHub - non serve copiare file manualmente 
 
 FROM node:20-slim
 
