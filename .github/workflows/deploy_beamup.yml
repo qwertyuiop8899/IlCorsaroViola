@@ -2,7 +2,7 @@ name: Deploy to Beamup
 
 on:
   workflow_dispatch:
-
+  
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,7 +18,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan ${{ secrets.BEAMUP_HOST }} >> ~/.ssh/known_hosts
-          git remote add beamup ssh://dokku@${{ secrets.BEAMUP_HOST }}/${{ secrets.PROJECT_NAME }}
+          git remote add beamup dokku@${{ secrets.BEAMUP_HOST }}:${{ secrets.PROJECT_NAME }}
 
       - name: Deploy to Beamup
         run: |
