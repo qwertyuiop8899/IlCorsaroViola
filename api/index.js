@@ -13,6 +13,7 @@ const fuzzball = require('fuzzball');
 const dbHelper = require('../db-helper.cjs');
 const { completeIds } = require('../lib/id-converter.cjs');
 const rdCacheChecker = require('../rd-cache-checker.cjs');
+const tbCacheChecker = require('../tb-cache-checker.cjs');
 const { searchRARBG } = require('../rarbg.cjs');
 const aioFormatter = require('../aiostreams-formatter.cjs');
 const packFilesHandler = require('../pack-files-handler.cjs');
@@ -8193,16 +8194,107 @@ async function handleStream(type, id, config, workerOrigin) {
         if (useTorbox) {
             console.log('📦 Checking Torbox cache...');
             cacheChecks.push(
-                Promise.all([
-                    torboxService.checkCache(hashes),
-                    torboxService.getTorrents().catch(e => {
+                (async () => {
+                    // STEP 1: Check DB cache for known cached torrents (< 10 days)
+                    let dbCachedResults = {};
+                    if (dbEnabled) {
+                        dbCachedResults = await dbHelper.getTbCachedAvailability(hashes);
+                        console.log(`💾 [DB Cache TB] ${Object.keys(dbCachedResults).length}/${hashes.length} hashes found in cache (< 10 days)`);
+                    }
+
+                    // STEP 2: Set DB cached results as base
+                    torboxCacheResults = { ...dbCachedResults };
+
+                    // STEP 3: Get user torrents (personal cache)
+                    torboxUserTorrents = await torboxService.getTorrents().catch(e => {
                         console.error("⚠️ Failed to fetch Torbox user torrents.", e.message);
                         return [];
-                    })
-                ]).then(([cache, torrents]) => {
-                    torboxCacheResults = cache;
-                    torboxUserTorrents = torrents;
-                })
+                    });
+
+                    // STEP 4: Save user's personal cache to DB
+                    if (dbEnabled && torboxUserTorrents.length > 0) {
+                        const userCacheToSave = torboxUserTorrents
+                            .filter(t => {
+                                if (!t.hash || t.download_finished !== true) return false;
+                                const hLower = t.hash.toLowerCase();
+                                if (!hashes.includes(hLower)) return false;
+
+                                const res = filteredResults.find(r => r.infoHash?.toLowerCase() === hLower);
+                                if (res?.skipDbSave) return false;
+                                return true;
+                            })
+                            .map(t => ({
+                                hash: t.hash.toLowerCase(),
+                                cached: true,
+                                file_title: t.name || t.filename, // Torbox uses 'name' usually
+                                size: t.size || t.bytes
+                            }));
+
+                        if (userCacheToSave.length > 0) {
+                            await dbHelper.updateTbCacheStatus(userCacheToSave, type);
+                            if (DEBUG_MODE) console.log(`💾 [GLOBAL CACHE TB] Saved ${userCacheToSave.length} personal torrents to DB`);
+                        }
+                    }
+
+                    // STEP 5: Live check for hashes NOT in DB cache
+                    const userDownloadedHashes = new Set(
+                        torboxUserTorrents
+                            .filter(t => t.download_finished === true)
+                            .map(t => t.hash?.toLowerCase())
+                    );
+                    const uncachedHashes = hashes.filter(h => {
+                        const isConfirmedCached = dbCachedResults[h]?.cached === true;
+                        const inUserDownloaded = userDownloadedHashes.has(h);
+                        return !isConfirmedCached && !inUserDownloaded;
+                    });
+
+                    if (uncachedHashes.length > 0 && config.torbox_key) {
+                        console.log(`🔍 [TB Live Check] ${uncachedHashes.length} hashes without cache info`);
+
+                        const itemsToCheck = uncachedHashes.map(hash => {
+                            const result = filteredResults.find(r => r.infoHash?.toLowerCase() === hash);
+                            if (result?.skipDbSave) return null;
+                            return result ? { hash, magnet: result.magnetLink } : null;
+                        }).filter(Boolean);
+
+                        if (itemsToCheck.length > 0) {
+                            const dbCachedCount = hashes.filter(h => dbCachedResults[h]?.cached === true).length;
+                            const syncLimit = Math.max(0, 5 - dbCachedCount);
+                            const syncItems = itemsToCheck.slice(0, syncLimit);
+
+                            if (syncItems.length > 0) {
+                                if (DEBUG_MODE) console.log(`⏩ [TB Cache] Running background check for ${syncItems.length} items...`);
+                                tbCacheChecker.checkCacheSync(syncItems, config.torbox_key, syncLimit)
+                                    .then(async (liveCheckResults) => {
+                                        const liveResultsToSave = Object.entries(liveCheckResults).map(([hash, data]) => {
+                                            const originalResult = filteredResults.find(r => r.infoHash?.toLowerCase() === hash);
+                                            if (originalResult?.skipDbSave) return null;
+                                            return {
+                                                hash,
+                                                cached: data.cached,
+                                                file_title: data.file_title || null,
+                                                file_size: data.file_size || null
+                                            };
+                                        }).filter(Boolean);
+
+                                        if (liveResultsToSave.length > 0 && dbEnabled) {
+                                            await dbHelper.updateTbCacheStatus(liveResultsToSave, type);
+                                            console.log(`💾 [DB TB] Saved ${liveResultsToSave.length} background live check results`);
+                                        }
+
+                                        // Merge into valid results for current response
+                                        Object.assign(torboxCacheResults, liveCheckResults);
+                                    })
+                                    .catch(err => console.warn(`⚠️ [TB Cache] Background check failed: ${err.message}`));
+                            }
+
+                            const asyncItems = itemsToCheck.slice(syncLimit);
+                            if (asyncItems.length > 0) {
+                                tbCacheChecker.enrichCacheBackground(asyncItems, config.torbox_key, dbHelper);
+                            }
+                        }
+                    }
+                })()
             );
         }
 
@@ -11526,6 +11618,12 @@ export default async function handler(req, res) {
                 const magnetLink = decodeURIComponent(encodedMagnet);
                 const infoHash = extractInfoHash(magnetLink)?.toLowerCase();
                 if (!infoHash) throw new Error('Magnet link non valido o senza info hash.');
+
+                // 🔄 REFRESH TB CACHE TIMESTAMP (Extend validity for 10 days)
+                if (dbEnabled && infoHash) {
+                    dbHelper.refreshTbCacheTimestamp(infoHash)
+                        .catch(err => console.error(`⚠️ [TB Refresh] Failed to refresh cache timestamp: ${err.message}`));
+                }
 
                 const torbox = new Torbox(userConfig.torbox_key);
 
