@@ -413,9 +413,6 @@ async function updateRdCacheStatus(cacheResults, mediaType = null) {
           last_cached_check = NOW(),
           file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
           size = COALESCE(EXCLUDED.size, torrents.size),
-          last_cached_check = NOW(),
-          file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
-          size = COALESCE(EXCLUDED.size, torrents.size),
           title = CASE WHEN torrents.provider = 'rd_cache' THEN COALESCE(EXCLUDED.title, torrents.title) ELSE torrents.title END,
           type = CASE WHEN torrents.type = 'unknown' THEN COALESCE(EXCLUDED.type, torrents.type) ELSE torrents.type END
       `;
@@ -494,9 +491,6 @@ async function updateTbCacheStatus(cacheResults, mediaType = null) {
         VALUES ($1, 'tb_cache', $2, $6, NOW(), $3, NOW(), $4, $5)
         ON CONFLICT (info_hash) DO UPDATE SET
           cached_tb = EXCLUDED.cached_tb,
-          last_cached_check_tb = NOW(),
-          file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
-          size = COALESCE(EXCLUDED.size, torrents.size),
           last_cached_check_tb = NOW(),
           file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
           size = COALESCE(EXCLUDED.size, torrents.size),
