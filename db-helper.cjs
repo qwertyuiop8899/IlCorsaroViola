@@ -392,12 +392,11 @@ async function updateRdCacheStatus(cacheResults, mediaType = null) {
         continue; // Don't create garbage record
       }
 
-      // ✅ FIX: Never create new records without a real title
-      // Only UPDATE existing records, never INSERT garbage placeholders
-      if (!existsInDb && !realTitle) {
-        skipped++;
-        continue; // Don't create RD-xxx garbage records
-      }
+      // ✅ FIX: Allow placeholders (we have size, will fix later)
+      // if (!existsInDb && !realTitle) {
+      //   skipped++;
+      //   continue; 
+      // }
 
       // Use real title (required for new records, optional for updates)
       const titleToSave = realTitle || null;
@@ -411,6 +410,9 @@ async function updateRdCacheStatus(cacheResults, mediaType = null) {
         VALUES ($1, 'rd_cache', $2, $6, NOW(), $3, NOW(), $4, $5)
         ON CONFLICT (info_hash) DO UPDATE SET
           cached_rd = EXCLUDED.cached_rd,
+          last_cached_check = NOW(),
+          file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
+          size = COALESCE(EXCLUDED.size, torrents.size),
           last_cached_check = NOW(),
           file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
           size = COALESCE(EXCLUDED.size, torrents.size),
@@ -477,10 +479,10 @@ async function updateTbCacheStatus(cacheResults, mediaType = null) {
         continue;
       }
 
-      if (!existsInDb && !realTitle) {
-        skipped++;
-        continue;
-      }
+      // if (!existsInDb && !realTitle) {
+      //   skipped++;
+      //   continue;
+      // }
 
       const titleToSave = realTitle || null;
 
@@ -492,6 +494,9 @@ async function updateTbCacheStatus(cacheResults, mediaType = null) {
         VALUES ($1, 'tb_cache', $2, $6, NOW(), $3, NOW(), $4, $5)
         ON CONFLICT (info_hash) DO UPDATE SET
           cached_tb = EXCLUDED.cached_tb,
+          last_cached_check_tb = NOW(),
+          file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
+          size = COALESCE(EXCLUDED.size, torrents.size),
           last_cached_check_tb = NOW(),
           file_title = COALESCE(NULLIF(EXCLUDED.file_title, ''), torrents.file_title),
           size = COALESCE(EXCLUDED.size, torrents.size),
@@ -590,7 +595,7 @@ async function getTbCachedAvailability(hashes) {
       WHERE info_hash = ANY($1)
         AND cached_tb IS NOT NULL
         AND last_cached_check_tb IS NOT NULL
-        AND last_cached_check_tb > NOW() - INTERVAL '10 days'
+        AND last_cached_check_tb > NOW() - INTERVAL '7 days'
     `;
 
     const result = await pool.query(query, [lowerHashes]);
@@ -606,7 +611,8 @@ async function getTbCachedAvailability(hashes) {
       };
     });
 
-    if (DEBUG_MODE) console.log(`💾 [DB] Found ${result.rows.length}/${hashes.length} hashes with valid TB cache (< 10 days)`);
+    if (DEBUG_MODE) console.log(`💾 [DB] Found ${result.rows.length}/${hashes.length} hashes with valid TB cache (< 7 days)`);
+
 
     return cachedMap;
 
