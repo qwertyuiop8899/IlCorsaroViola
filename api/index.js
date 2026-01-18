@@ -5089,7 +5089,28 @@ function isExactMovieMatch(torrentTitle, movieTitle, year) {
             normalizedTorrentTitle.includes(word)
         );
         const percentageMatch = matchingWords.length / movieWords.length;
-        hasEnoughMovieWords = percentageMatch >= 0.7;
+        hasEnoughMovieWords = percentageMatch >= 0.9; // Recommend high threshold for containment
+
+        // 🚨 SEQUEL PROTECTION: Check for SIGNIFICANT extra words
+        // Example: "Glass Onion: A Knives Out Mystery" vs "Knives Out"
+        // Both have 100% containment of "Knives Out".
+        // But "Glass Onion" is a huge prefix.
+        if (hasEnoughMovieWords) {
+            // Remove the movie title from the torrent title to see what's left
+            // Using a simple replace approach
+            let remaining = normalizedTorrentTitle;
+            movieWords.forEach(w => remaining = remaining.replace(w, ''));
+            const extraWords = remaining.split(/\s+/).filter(w => w.length > 3);
+
+            // If we have > 2 significant extra words, we MUST enforce strict year match
+            // This allows "Knives Out Extended Cut" (extra words) vs "Knives Out" if year is good
+            // But blocks "Glass Onion Knives Out" if year is wrong.
+            if (extraWords.length > 2) {
+                if (DEBUG_MODE) console.log(`⚠️ [Movie Match] Found significant extra words: [${extraWords.join(', ')}]. Enforcing strict year match.`);
+                // We don't return false yet, we just ensure year check below is strict.
+            }
+        }
+
         if (!hasEnoughMovieWords) {
             if (DEBUG_MODE) console.log(`❌ Movie match failed for "${torrentTitle}" - ${percentageMatch.toFixed(2)} match`);
         }
@@ -5101,11 +5122,29 @@ function isExactMovieMatch(torrentTitle, movieTitle, year) {
 
     const yearMatch = torrentTitle.match(/(?:19|20)\d{2}/);
 
-    const yearMatches = !yearMatch ||
-        yearMatch[0] === year.toString() ||
-        Math.abs(parseInt(yearMatch[0]) - parseInt(year)) <= 1;
+    // Strict Year Match Flag (default false)
+    let mustHaveStrictYear = false;
 
-    if (DEBUG_MODE) console.log(`${yearMatches ? '✅' : '❌'} Year match for "${torrentTitle}" (${year})`);
+    // Check previously calculated extra words
+    if (hasEnoughMovieWords) {
+        let remaining = normalizedTorrentTitle;
+        movieWords.forEach(w => remaining = remaining.replace(w, ''));
+        const extraWords = remaining.split(/\s+/).filter(w => w.length > 3);
+
+        if (extraWords.length > 2) {
+            mustHaveStrictYear = true;
+            if (DEBUG_MODE) console.log(`⚠️ [Movie Match] Found significant extra words: [${extraWords.join(', ')}]. Enforcing STRICT year match.`);
+        }
+    }
+
+    // Validation Logic:
+    // 1. If strict mode: Year MUST exist AND match exactly (no tolerance)
+    // 2. If normal mode: No year is OK OR year matches with tolerance
+    const yearMatches = mustHaveStrictYear
+        ? (yearMatch && yearMatch[0] === year.toString())
+        : (!yearMatch || yearMatch[0] === year.toString() || Math.abs(parseInt(yearMatch[0]) - parseInt(year)) <= 1);
+
+    if (DEBUG_MODE) console.log(`${yearMatches ? '✅' : '❌'} Year match for "${torrentTitle}" (${year}) ${mustHaveStrictYear ? '[STRICT]' : ''}`);
     return yearMatches;
 }
 
@@ -7518,10 +7557,25 @@ async function handleStream(type, id, config, workerOrigin) {
                     const torrentTitle = result.title || result.websiteTitle;
 
                     // 🎯 SKIP YEAR FILTERING FOR PACKS (they contain multiple movies with different years)
-                    // Packs are identified by having a fileIndex (from pack_files table)
+                    // 🎯 SMART FILTERING: Check for Pack/FileIndex
+                    // - If fileIndex is present, it means we have a specific file resolved.
+                    // - OLD BUG: We blindly skipped year check, allowing "Glass Onion" (2022) for "Knives Out" (2019)
+                    //   because "Glass Onion" has fileIndex=0.
+                    // - NEW LOGIC: Only skip year check if:
+                    //   A) It's a REAL pack (collection/trilogy) AND verified
+                    //   B) The IMDb ID matches EXACTLY what we requested (trust the DB)
+                    //   C) The title matches strictly
+
                     if (result.fileIndex !== null && result.fileIndex !== undefined) {
-                        if (DEBUG_MODE) console.log(`🎬 [Pack] SKIP year filter for pack: ${torrentTitle.substring(0, 60)}... (fileIndex=${result.fileIndex})`);
-                        return true; // Always keep packs, they're already filtered by IMDb ID in DB query
+                        // Trust strict ID + Verified
+                        if (result.imdb_id === mediaDetails.imdbId) {
+                            if (DEBUG_MODE) console.log(`🎬 [Pack] TRUST DB for pack: ${torrentTitle.substring(0, 60)}... (ID match)`);
+                            return true;
+                        }
+
+                        // If ID doesn't match (or is missing), fall through to standard Name/Year check below.
+                        // This catches "Glass Onion" (wrong ID or text match) trying to pass as "Knives Out".
+                        if (DEBUG_MODE) console.log(`🎬 [Pack] No ID match, enforcing filters for pack file: ${torrentTitle.substring(0, 60)}...`);
                     }
 
                     // Try matching with English title
