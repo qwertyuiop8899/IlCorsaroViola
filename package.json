@@ -1,8 +1,8 @@
 {
   "name": "ilcorsaroviola",
-  "version": "6.0.0",
+  "version": "6.5.0",
   "private": true,
-  "description": "Addon Stremio per UIndex, CorsaroNero con DB interno e Knaben con supporto Real-Debrid con MFP per la condivisione, Torbox, Alldebrid e Jackett.",
+  "description": "Addon Stremio CorsaroNero con DB interno e altri provider con supporto Real-Debrid con MFP per la condivisione, Torbox e Jackett.",
   "type": "module",
   "engines": {
     "node": "20.x"
@@ -30,4 +30,5 @@
     "vercel": "^34.2.0"
   }
 }
+
 
