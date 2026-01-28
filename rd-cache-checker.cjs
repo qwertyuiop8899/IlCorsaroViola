@@ -136,7 +136,7 @@ async function checkSingleHash(infoHash, magnet, token) {
         let mainFileSize = 0;
         let torrentTitle = info.filename || ''; // Get torrent title
         let torrentSize = info.bytes || 0;     // Get total torrent size
-        
+
         // 🚀 SPEEDUP: Extract ALL video files for pack support
         let allVideoFiles = [];
 
@@ -148,7 +148,7 @@ async function checkSingleHash(infoHash, magnet, token) {
             const videoFiles = info.files
                 .filter(f => videoExtensions.test(f.path))
                 .sort((a, b) => (b.bytes || 0) - (a.bytes || 0));
-            
+
             // 🚀 SPEEDUP: Save all video files (>25MB) for pack resolution
             allVideoFiles = info.files
                 .filter(f => videoExtensions.test(f.path) && f.bytes > 25 * 1024 * 1024)
@@ -165,7 +165,7 @@ async function checkSingleHash(infoHash, magnet, token) {
                 mainFileSize = videoFiles[0].bytes || 0; // ✅ Capture file size
                 if (DEBUG_MODE) console.log(`📄 [RD Cache] Main file: ${mainFileName.substring(0, 50)}... (${(mainFileSize / 1024 / 1024).toFixed(2)} MB)`);
             }
-            
+
             // 🚀 SPEEDUP: Log pack info
             if (allVideoFiles.length > 1) {
                 if (DEBUG_MODE) console.log(`📦 [RD Cache] Pack detected: ${allVideoFiles.length} video files`);
@@ -276,56 +276,56 @@ async function enrichCacheBackground(items, token, dbHelper) {
                         skippedAlreadyCached++;
                         continue;
                     }
-                    
+
                     // 1 second delay BEFORE each call (RD allows 200/min = 1 every 300ms, but be safe)
                     await sleep(1000);
-                    
+
                     const result = await checkSingleHash(item.hash, item.magnet, token);
                     results.push(result);
                 }
 
-            // Save all results to DB
-            if (dbHelper && typeof dbHelper.updateRdCacheStatus === 'function') {
-                const cacheUpdates = results.map(r => ({
-                    hash: r.hash,
-                    cached: r.cached,
-                    torrent_title: r.torrent_title || null,
-                    size: r.size || null,
-                    file_title: r.file_title || null,
-                    file_size: r.file_size || null
-                }));
+                // Save all results to DB
+                if (dbHelper && typeof dbHelper.updateRdCacheStatus === 'function') {
+                    const cacheUpdates = results.map(r => ({
+                        hash: r.hash,
+                        cached: r.cached,
+                        torrent_title: r.torrent_title || null,
+                        size: r.size || null,
+                        file_title: r.file_title || null,
+                        file_size: r.file_size || null
+                    }));
 
-                await dbHelper.updateRdCacheStatus(cacheUpdates);
-                if (DEBUG_MODE) console.log(`✅ [RD Cache Background] Enriched ${results.length} hashes (skipped ${skippedAlreadyCached} already in DB)`);
-            }
-            
-            // 🚀 SPEEDUP: Save pack files ONLY if title indicates a pack
-            if (dbHelper && typeof dbHelper.insertPackFiles === 'function') {
-                for (const result of results) {
-                    // ✅ FIXED: Only save if TITLE indicates pack (trilogia, collection, etc.)
-                    // NOT just because it has >1 file (single movies can have .nfo, .srt files)
-                    const isPack = isPackTitle(result.torrent_title) && result.files && result.files.length > 1;
-                    
-                    if (result.cached && isPack) {
-                        try {
-                            const packFilesData = result.files.map(f => ({
-                                pack_hash: result.hash.toLowerCase(),
-                                imdb_id: null,
-                                file_index: f.id,
-                                file_path: f.path,
-                                file_size: f.bytes || 0
-                            }));
-                            await dbHelper.insertPackFiles(packFilesData);
-                            if (DEBUG_MODE) console.log(`📦 [RD Cache Background] Saved ${result.files.length} pack files for ${result.hash.substring(0, 8)}`);
-                        } catch (packErr) {
-                            console.warn(`⚠️ [RD Cache Background] Failed to save pack files: ${packErr.message}`);
+                    await dbHelper.updateRdCacheStatus(cacheUpdates);
+                    if (DEBUG_MODE) console.log(`✅ [RD Cache Background] Enriched ${results.length} hashes (skipped ${skippedAlreadyCached} already in DB)`);
+                }
+
+                // 🚀 SPEEDUP: Save pack files ONLY if title indicates a pack
+                if (dbHelper && typeof dbHelper.insertPackFiles === 'function') {
+                    for (const result of results) {
+                        // ✅ FIXED: Only save if TITLE indicates pack (trilogia, collection, etc.)
+                        // NOT just because it has >1 file (single movies can have .nfo, .srt files)
+                        const isPack = isPackTitle(result.torrent_title) && result.files && result.files.length > 1;
+
+                        if (result.cached && isPack) {
+                            try {
+                                const packFilesData = result.files.map(f => ({
+                                    pack_hash: result.hash.toLowerCase(),
+                                    imdb_id: null,
+                                    file_index: f.id,
+                                    file_path: f.path,
+                                    file_size: f.bytes || 0
+                                }));
+                                await dbHelper.insertPackFiles(packFilesData);
+                                if (DEBUG_MODE) console.log(`📦 [RD Cache Background] Saved ${result.files.length} pack files for ${result.hash.substring(0, 8)}`);
+                            } catch (packErr) {
+                                console.warn(`⚠️ [RD Cache Background] Failed to save pack files: ${packErr.message}`);
+                            }
                         }
                     }
                 }
+            } catch (error) {
+                console.error(`❌ [RD Cache Background] Error:`, error.message);
             }
-        } catch (error) {
-            console.error(`❌ [RD Cache Background] Error:`, error.message);
-        }
         })();
     }, 5000); // 5 second delay - runs AFTER response is already sent
 }
