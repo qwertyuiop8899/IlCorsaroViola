@@ -17,10 +17,12 @@ const TORRENTIO_BASE_DOMAIN = process.env.TORRENTIO_BASE_URL || '';
 
 const EXTERNAL_ADDONS = {
     torrentio: {
-        baseUrl: TORRENTIO_BASE_DOMAIN ? `${TORRENTIO_BASE_DOMAIN}/oResults=false/aHR0cHM6Ly90b3JyZW50aW8uc3RyZW0uZnVuL3Byb3ZpZGVycz15dHMsZXp0dixyYXJiZywxMzM3eCx0aGVwaXJhdGViYXksa2lja2Fzc3RvcnJlbnRzLHRvcnJlbnRnYWxheHksbWFnbmV0ZGwsaG9ycmlibGVzdWJzLG55YWFzaSx0b2t5b3Rvc2hvLGFuaWRleCxydXRvcixydXRyYWNrZXIsY29tYW5kbyxibHVkdix0b3JyZW50OSxpbGNvcnNhcm9uZXJvLG1lam9ydG9ycmVudCx3b2xmbWF4NGssY2luZWNhbGlkYWQsYmVzdHRvcnJlbnRzfGxhbmd1YWdlPWl0YWxpYW58c29ydD1xdWFsaXR5c2l6ZXxxdWFsaXR5ZmlsdGVyPXRocmVlZCxzY3IsY2FtfGxpbWl0PTc=` : null,
+        // Use direct Torrentio URL - the proxy (torrentioita.stremio.dpdns.org) gives 500 errors on stream requests
+        baseUrl: TORRENTIO_BASE_DOMAIN ? `${TORRENTIO_BASE_DOMAIN}/oResults=false/aHR0cHM6Ly90b3JyZW50aW8uc3RyZW0uZnVuL3Byb3ZpZGVycz15dHMsZXp0dixyYXJiZywxMzM3eCx0aGVwaXJhdGViYXksa2lja2Fzc3RvcnJlbnRzLHRvcnJlbnRnYWxheHksbWFnbmV0ZGwsaG9ycmlibGVzdWJzLG55YWFzaSx0b2t5b3Rvc2hvLGFuaWRleCxydXRvcixydXRyYWNrZXIsY29tYW5kbyxibHVkdix0b3JyZW50OSxpbGNvcnNhcm9uZXJvLG1lam9ydG9ycmVudCx3b2xmbWF4NGssY2luZWNhbGlkYWQsYmVzdHRvcnJlbnRzfGxhbmd1YWdlPWl0YWxpYW58c29ydD1xdWFsaXR5c2l6ZXxxdWFsaXR5ZmlsdGVyPXNjcixjYW18bGltaXQ9Ng==` : null,
+        //baseUrl: 'https://torrentio.strem.fun/providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl,horriblesubsnyaasi,tokyotosho,anidex,rutor,rutracker,comando,bludv,torrent9,ilcorsaronero,mejortorrent,wolfmax4k,cinecalidad,besttorrents|language=italian|sort=qualitysize|qualityfilter=scr,cam',
         name: 'Torrentio',
         emoji: '🅣',
-        timeout: 1500
+        timeout: 2000  // Increased from 1500ms - Torrentio can be slow
     },
     mediafusion: {
         baseUrl: 'https://mediafusionfortheweebs.midnightignite.me/D-FCO8JXfrGOKFpP-Rim96nHZU9epOb5RPbSpgkgVbYoR1NRJNR1C-9X4VDrUSJJNEvp5pk7CGvSLN7cUHUrth3QG8e3mSPa8Ind2k4VzVGFEa-310EjXdsXT_uUXGri86EVnnQ6f_9b0yoVTuVu7Aqk4uY8IXZp47-0FmuxgXX6wleis_0Evllc0v2wcrWIj-D5m3IZhI18CKHr-pUL5h61ZWcaRuxGjgwYK88Xy3PIN2U3YzTi4J9pazQBpCNDH-NpZPwk2RVnjs0WF7dRU5XD_D0robmhH9q0edoqaR_71u1j2y-XnxkwPNjg-o5Yb_',
@@ -29,7 +31,7 @@ const EXTERNAL_ADDONS = {
         timeout: 1500
     },
     comet: {
-        baseUrl: 'https://cometfortheweebs.midnightignite.me/eyJtYXhSZXN1bHRzUGVyUmVzb2x1dGlvbiI6OCwibWF4U2l6ZSI6MCwiY2FjaGVkT25seSI6ZmFsc2UsInNvcnRDYWNoZWRVbmNhY2hlZFRvZ2V0aGVyIjpmYWxzZSwicmVtb3ZlVHJhc2giOnRydWUsInJlc3VsdEZvcm1hdCI6WyJhbGwiXSwiZGVicmlkU2VydmljZSI6InRvcnJlbnQiLCJkZWJyaWRBcGlLZXkiOiIiLCJkZWJyaWRTdHJlYW1Qcm94eVBhc3N3b3JkIjoiIiwibGFuZ3VhZ2VzIjp7ImV4Y2x1ZGUiOlsiZW4iLCJqYSIsInpoIiwicnUiLCJhciIsInB0IiwiZXMiLCJmciIsImRlIiwia28iLCJoaSIsImJuIiwicGEiLCJtciIsImd1IiwidGEiLCJ0ZSIsImtuIiwibWwiLCJ0aCIsInZpIiwiaWQiLCJ0ciIsImhlIiwiZmEiLCJ1ayIsImVsIiwibHQiLCJsdiIsImV0IiwicGwiLCJjcyIsInNrIiwiaHUiLCJybyIsImJnIiwic3IiLCJociIsInNsIiwibmwiLCJkYSIsImZpIiwic3YiLCJubyIsIm1zIiwibGEiXSwicHJlZmVycmVkIjpbIm11bHRpIiwiaXQiXX0sInJlc29sdXRpb25zIjp7InIzNjBwIjpmYWxzZX0sIm9wdGlvbnMiOnsicmVtb3ZlX3JhbmtzX3VuZGVyIjotMTAwMDAwMDAwMDAsImFsbG93X2VuZ2xpc2hfaW5fbGFuZ3VhZ2VzIjpmYWxzZSwicmVtb3ZlX3Vua25vd25fbGFuZ3VhZ2VzIjpmYWxzZX19',
+        baseUrl: 'https://comet.feels.legal/eyJtYXhSZXN1bHRzUGVyUmVzb2x1dGlvbiI6MCwibWF4U2l6ZSI6MCwiY2FjaGVkT25seSI6ZmFsc2UsInNvcnRDYWNoZWRVbmNhY2hlZFRvZ2V0aGVyIjpmYWxzZSwicmVtb3ZlVHJhc2giOnRydWUsInJlc3VsdEZvcm1hdCI6WyJhbGwiXSwiZGVicmlkU2VydmljZXMiOltdLCJlbmFibGVUb3JyZW50Ijp0cnVlLCJkZWR1cGxpY2F0ZVN0cmVhbXMiOmZhbHNlLCJkZWJyaWRTdHJlYW1Qcm94eVBhc3N3b3JkIjoiIiwibGFuZ3VhZ2VzIjp7InJlcXVpcmVkIjpbIm11bHRpIiwiaXQiXSwiYWxsb3dlZCI6WyJtdWx0aSIsIml0Il0sImV4Y2x1ZGUiOlsiamEiLCJ6aCIsInJ1IiwiYXIiLCJwdCIsImVzIiwiZnIiLCJkZSIsImtvIiwiaGkiLCJibiIsInBhIiwibXIiLCJndSIsInRhIiwidGUiLCJrbiIsIm1sIiwidGgiLCJ2aSIsImlkIiwidHIiLCJoZSIsImZhIiwidWsiLCJlbCIsImx0IiwibHYiLCJldCIsInBsIiwiY3MiLCJzayIsImh1Iiwicm8iLCJiZyIsInNyIiwiaHIiLCJzbCIsIm5sIiwiZGEiLCJmaSIsInN2Iiwibm8iLCJtcyIsImxhIl0sInByZWZlcnJlZCI6WyJpdCJdfSwicmVzb2x1dGlvbnMiOnt9LCJvcHRpb25zIjp7InJlbW92ZV9yYW5rc191bmRlciI6LTEwMDAwMDAwMDAwLCJhbGxvd19lbmdsaXNoX2luX2xhbmd1YWdlcyI6ZmFsc2UsInJlbW92ZV91bmtub3duX2xhbmd1YWdlcyI6ZmFsc2V9fQ==',
         name: 'Comet',
         emoji: '🅒',
         timeout: 1500
@@ -259,6 +261,10 @@ function normalizeExternalStream(stream, addonKey) {
         mainFileSize: sizeBytes,
         seeders: seeders || stream.peers || 0,
         leechers: 0,
+
+        // 🔧 Pack detection: if we have a description different from filename, it might be a pack
+        rawDescription: text,  // Full description from addon (e.g. "📁 Filmografia Disney... 📄 Le Follie...")
+        potentialPack: filename && text && !text.startsWith(filename) && text.length > filename.length + 20,
 
         // Sorgente e tracking
         source: originalProvider ? `${addon.name} (${originalProvider})` : addon.name,
