@@ -860,7 +860,7 @@ function applyCustomFormatter(stream, result, userConfig, serviceName = 'RD', is
             },
             addon: {
                 name: 'IlCorsaroViola',
-                version: '7.1.0',
+                version: '7.0.0',
                 presetId: preset,
                 manifestUrl: null
             },
@@ -8743,10 +8743,20 @@ async function handleStream(type, id, config, workerOrigin) {
             filteredResults = filteredResults.filter(result => {
                 const provider = (result.source || result.externalAddon || '').toLowerCase();
 
-                // ✅ EXEMPT MANUAL & PACKS from Full ITA Strict Mode
+                // ✅ EXEMPT MANUAL from Full ITA Strict Mode (user added it manually)
                 const isManual = provider.includes('manual_add');
-                const isMoviePackLink = (type === 'movie' && result.fileIndex !== undefined && result.fileIndex !== null);
-                if (isManual || isMoviePackLink) return true;
+                if (isManual) return true;
+
+                // 🔧 FIX: ALL packs (movie AND series) must have ITA in title or file_title
+                const isPackLink = (result.fileIndex !== undefined && result.fileIndex !== null);
+                if (isPackLink) {
+                    // Check for ITA in file_title or title
+                    const fileTitle = (result.file_title || '').toLowerCase();
+                    const title = (result.title || result.websiteTitle || '').toLowerCase();
+                    const hasItaInPack = /\bita\b|italian|italiano/i.test(fileTitle) || /\bita\b|italian|italiano/i.test(title);
+                    if (hasItaInPack) return true;
+                    // If no ITA found, continue with normal checks below (will be filtered)
+                }
 
                 // Extract MAIN provider only (before parentheses) to avoid false positives
                 // e.g., "comet (torrentio)" → "comet" (NOT exempt)
@@ -10703,7 +10713,7 @@ export default async function handler(req, res) {
 
             const manifest = {
                 id: 'community.ilcorsaroviola.ita',
-                version: '7.1.0',
+                version: '7.0.0',
                 name: addonName,
                 description: 'Streaming da UIndex, CorsaroNero DB local, Knaben e Jackettio con o senza Real-Debrid, Torbox e Alldebrid.',
                 logo: 'https://i.imgur.com/kZK4KKS.png',
@@ -13042,7 +13052,7 @@ export default async function handler(req, res) {
             const health = {
                 status: 'OK',
                 addon: 'IlCorsaroViola',
-                version: '7.1.0',
+                version: '7.0.0',
                 uptime: Date.now(),
                 cache: {
                     entries: cache.size,
