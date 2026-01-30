@@ -298,7 +298,7 @@ async function searchEpisodeFiles(imdbId, season, episode, providers = null) {
 }
 
 /**
- * Insert new torrent into database
+ * Insert new torrent into database (or update size if exists with size=0)
  * @param {Object} torrent - Torrent data
  * @returns {Promise<boolean>} Success status
  */
@@ -310,14 +310,29 @@ async function insertTorrent(torrent) {
   try {
     await client.query('BEGIN');
 
-    // Check if torrent exists
+    // Check if torrent exists (and get current size)
     const checkResult = await client.query(
-      'SELECT info_hash FROM torrents WHERE info_hash = $1',
+      'SELECT info_hash, size, title FROM torrents WHERE info_hash = $1',
       [torrent.infoHash]
     );
 
     if (checkResult.rows.length > 0) {
-      if (DEBUG_MODE) console.log(`💾 [DB] Torrent ${torrent.infoHash} already exists, skipping`);
+      const existingSize = checkResult.rows[0].size;
+      const existingTitle = checkResult.rows[0].title;
+      const newSize = torrent.size || 0;
+      
+      // ✅ UPSERT: Update size if current is 0/NULL and new size is provided
+      if ((!existingSize || existingSize === 0) && newSize > 0) {
+        await client.query(
+          'UPDATE torrents SET size = $1 WHERE info_hash = $2',
+          [newSize, torrent.infoHash]
+        );
+        await client.query('COMMIT');
+        console.log(`📏 [DB] Updated size for ${torrent.infoHash.substring(0, 8)}...: 0 -> ${(newSize / 1024 / 1024 / 1024).toFixed(2)} GB`);
+        return true;
+      }
+      
+      if (DEBUG_MODE) console.log(`💾 [DB] Torrent ${torrent.infoHash.substring(0, 8)}... already exists (size: ${(existingSize / 1024 / 1024 / 1024).toFixed(2)} GB), skipping`);
       await client.query('ROLLBACK');
       return false;
     }
@@ -1338,10 +1353,10 @@ async function insertPackFiles(packFiles) {
 /**
  * Get pack files for a specific pack with TTL check
  * @param {string} packHash - InfoHash of the pack
- * @param {number} ttlDays - TTL in days (default: 30)
+ * @param {number} ttlDays - TTL in days (default: 10, same as torrents)
  * @returns {Promise<{files: Array, expired: boolean}>} Files and expiration status
  */
-async function getPackFiles(packHash, ttlDays = 30) {
+async function getPackFiles(packHash, ttlDays = 10) {
   if (!pool) throw new Error('Database not initialized');
 
   try {
