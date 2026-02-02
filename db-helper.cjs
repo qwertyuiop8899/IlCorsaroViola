@@ -320,7 +320,7 @@ async function insertTorrent(torrent) {
       const existingSize = checkResult.rows[0].size;
       const existingTitle = checkResult.rows[0].title;
       const newSize = torrent.size || 0;
-      
+
       // ✅ UPSERT: Update size if current is 0/NULL and new size is provided
       if ((!existingSize || existingSize === 0) && newSize > 0) {
         await client.query(
@@ -331,7 +331,7 @@ async function insertTorrent(torrent) {
         console.log(`📏 [DB] Updated size for ${torrent.infoHash.substring(0, 8)}...: 0 -> ${(newSize / 1024 / 1024 / 1024).toFixed(2)} GB`);
         return true;
       }
-      
+
       if (DEBUG_MODE) console.log(`💾 [DB] Torrent ${torrent.infoHash.substring(0, 8)}... already exists (size: ${(existingSize / 1024 / 1024 / 1024).toFixed(2)} GB), skipping`);
       await client.query('ROLLBACK');
       return false;
@@ -1279,7 +1279,9 @@ async function searchPacksByTitle(title, year = null, imdbId = null) {
 
     console.log(`   ✅ Found ${result.rows.length} pack file(s) matching "${title}"`);
 
-    // If we found matches and have an imdbId, update pack_files to add the mapping
+    // 🔧 AUTO-INDEX DISABLED: This logic causes false positives with fuzzy search (e.g. Rio vs BeyWarriors)
+    // We should NOT update pack_files table based on loose title matching.
+    /*
     if (result.rows.length > 0 && imdbId) {
       for (const row of result.rows) {
         try {
@@ -1303,6 +1305,7 @@ async function searchPacksByTitle(title, year = null, imdbId = null) {
         }
       }
     }
+    */
 
     return result.rows;
   } catch (error) {
@@ -1617,7 +1620,6 @@ async function searchFilesByTitle(titleQuery, providers = null, options = {}) {
     const result = await pool.query(query, params);
     if (DEBUG_MODE) console.log(`💾 [DB] Found ${result.rows.length} file-matches (ILIKE) for "${titleQuery}"`);
 
-
     // 🔧 AUTO-INDEX DISABLED: This logic causes false positives with fuzzy search (e.g. Dexter vs Dexter New Blood)
     // We should NOT update files table based on loose title matching.
     /*
@@ -1637,7 +1639,6 @@ async function searchFilesByTitle(titleQuery, providers = null, options = {}) {
       }
     }
     */
-
 
     return result.rows;
   };
