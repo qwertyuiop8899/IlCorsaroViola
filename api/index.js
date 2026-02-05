@@ -206,7 +206,7 @@ const resolvePackNamesInBackground = async (torrents, config, mediaDetails, seas
 const runSequentialBackgroundJobs = async (options) => {
     const {
         itemsForCacheCheck,   // Array of { hash, magnet } for cache checking
-        itemsForPackCheck,    // Array of { hash, title } for pack resolution  
+        itemsForPackCheck,    // Array of { hash, title } for pack resolution
         config,
         dbHelper,
         type,
@@ -214,30 +214,30 @@ const runSequentialBackgroundJobs = async (options) => {
         season,
         episode
     } = options;
-    
+
     const DEBUG_MODE = process.env.DEBUG_MODE === 'true';
     const rdKey = config?.rd_key;
     const tbKey = config?.torbox_key;
-    
+
     console.log(`\n🔄 [Sequential BG] Starting sequential background processing...`);
     console.log(`   - Cache items: ${itemsForCacheCheck?.length || 0}`);
     console.log(`   - Pack items: ${itemsForPackCheck?.length || 0}`);
-    
+
     const cacheResults = [];
     const packResults = [];
-    
+
     // ═══════════════════════════════════════════════════════════
     // PHASE 1: SEQUENTIAL CACHE CHECK (1s delay between calls)
     // ═══════════════════════════════════════════════════════════
     if (itemsForCacheCheck && itemsForCacheCheck.length > 0) {
         console.log(`\n📦 [Sequential BG] Phase 1: Cache check (${itemsForCacheCheck.length} items)`);
-        
+
         for (let i = 0; i < itemsForCacheCheck.length; i++) {
             const item = itemsForCacheCheck[i];
-            
+
             try {
                 let result = null;
-                
+
                 // Try RD first
                 if (rdKey) {
                     result = await rdCacheChecker.checkSingleHash(item.hash, item.magnet, rdKey);
@@ -252,7 +252,7 @@ const runSequentialBackgroundJobs = async (options) => {
                     }
                     if (DEBUG_MODE) console.log(`   [${i + 1}/${itemsForCacheCheck.length}] TB cache: ${result?.cached ? '✅' : '❌'} ${item.hash.substring(0, 8)}`);
                 }
-                
+
                 if (result) {
                     cacheResults.push({
                         hash: item.hash,
@@ -266,21 +266,21 @@ const runSequentialBackgroundJobs = async (options) => {
                         files: result.files || null
                     });
                 }
-                
+
                 // ⏱️ 1 second delay between cache checks
                 if (i < itemsForCacheCheck.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                
+
             } catch (err) {
                 console.warn(`   ⚠️ Cache check failed for ${item.hash.substring(0, 8)}: ${err.message}`);
                 // Continue to next item
             }
         }
-        
+
         console.log(`   ✅ Cache check complete: ${cacheResults.filter(r => r.cached).length}/${cacheResults.length} cached`);
     }
-    
+
     // Save cache results to DB immediately
     if (cacheResults.length > 0 && dbHelper) {
         try {
@@ -309,7 +309,7 @@ const runSequentialBackgroundJobs = async (options) => {
             console.warn(`   ⚠️ Failed to save cache results: ${dbErr.message}`);
         }
     }
-    
+
     // ═══════════════════════════════════════════════════════════
     // PHASE 2: SEQUENTIAL PACK CHECK (2s delay between calls)
     // ═══════════════════════════════════════════════════════════
@@ -317,27 +317,27 @@ const runSequentialBackgroundJobs = async (options) => {
     const packsToResolve = cacheResults.filter(r => {
         // Is a pack AND is cached AND has files
         if (!r.cached || !r.is_pack) return false;
-        
+
         // Check if pack_name is valid (not episode name)
         const packNameValid = r.pack_name && rdCacheChecker.isValidPackName(r.pack_name);
-        
+
         // If pack_name is invalid, we need to resolve it
         return !packNameValid || !r.files || r.files.length === 0;
     });
-    
+
     // Also add items from itemsForPackCheck that aren't already in cache results
     const additionalPacks = (itemsForPackCheck || []).filter(item => {
         const alreadyChecked = cacheResults.some(r => r.hash.toLowerCase() === item.hash.toLowerCase());
         return !alreadyChecked;
     });
-    
+
     const allPacksToResolve = [...packsToResolve.map(r => ({ hash: r.hash, title: r.torrent_title })), ...additionalPacks];
-    
+
     // ✅ RATE LIMIT PROTECTION: Max 20 packs per request, ITA first
     // RD rate limit is per IP (not per API key), so all users on same VPS share limit
     // Remaining packs will be processed on next search for same content
     const MAX_PACKS_PER_REQUEST = 20;
-    
+
     // Sort: ITA packs first, then others
     const sortedPacks = allPacksToResolve.sort((a, b) => {
         const aHasIta = /ita/i.test(a.title || '');
@@ -346,40 +346,40 @@ const runSequentialBackgroundJobs = async (options) => {
         if (!aHasIta && bHasIta) return 1;
         return 0;
     });
-    
+
     const packsToProcess = sortedPacks.slice(0, MAX_PACKS_PER_REQUEST);
     const skippedPacks = allPacksToResolve.length - packsToProcess.length;
-    
+
     if (packsToProcess.length > 0 && type === 'series') {
         const itaCount = packsToProcess.filter(p => /ita/i.test(p.title || '')).length;
         console.log(`\n📦 [Sequential BG] Phase 2: Pack resolution (${packsToProcess.length}/${allPacksToResolve.length} packs, ${itaCount} ITA${skippedPacks > 0 ? `, ${skippedPacks} deferred to next search` : ''})`);
-        
+
         for (let i = 0; i < packsToProcess.length; i++) {
             const pack = packsToProcess[i];
-            
+
             try {
                 let packData = null;
-                
+
                 // Try RD first
                 if (rdKey && typeof packFilesHandler.fetchFilesFromRealDebrid === 'function') {
                     packData = await packFilesHandler.fetchFilesFromRealDebrid(pack.hash, rdKey);
                     if (DEBUG_MODE) console.log(`   [${i + 1}/${packsToProcess.length}] RD pack: ${packData?.files?.length || 0} files for ${pack.hash.substring(0, 8)}`);
                 }
-                
+
                 // Fallback to TB
                 if (!packData && tbKey && typeof packFilesHandler.fetchFilesFromTorbox === 'function') {
                     packData = await packFilesHandler.fetchFilesFromTorbox(pack.hash, tbKey);
                     if (DEBUG_MODE) console.log(`   [${i + 1}/${allPacksToResolve.length}] TB pack: ${packData?.files?.length || 0} files for ${pack.hash.substring(0, 8)}`);
                 }
-                
+
                 if (packData) {
                     // ✅ VALIDATE PACK NAME before saving
                     const realPackName = packData.filename;
                     const isValidName = rdCacheChecker.isValidPackName(realPackName);
-                    
+
                     if (realPackName && isValidName && realPackName !== pack.title) {
                         console.log(`   📦 Fixing pack name: "${pack.title?.substring(0, 30)}..." -> "${realPackName?.substring(0, 30)}..."`);
-                        
+
                         // Update title in DB
                         if (dbHelper && typeof dbHelper.updateTorrentTitle === 'function') {
                             await dbHelper.updateTorrentTitle(pack.hash, realPackName);
@@ -387,19 +387,19 @@ const runSequentialBackgroundJobs = async (options) => {
                     } else if (!isValidName) {
                         console.log(`   ⚠️ Skipped invalid pack name: "${realPackName}"`);
                     }
-                    
+
                     // Save pack files to DB
                     if (packData.files && packData.files.length > 0 && dbHelper) {
                         const seasonNum = parseInt(season) || packFilesHandler.extractSeasonFromPackTitle(realPackName || pack.title) || 1;
                         const filesToInsert = [];
-                        
+
                         for (const file of packData.files) {
                             if (!packFilesHandler.isVideoFile(file.path)) continue;
                             if (file.bytes < 50 * 1024 * 1024) continue; // Skip small files
-                            
+
                             const filename = file.path.split('/').pop();
                             const parsed = packFilesHandler.parseSeasonEpisode(filename, seasonNum);
-                            
+
                             if (parsed) {
                                 filesToInsert.push({
                                     info_hash: pack.hash,
@@ -412,26 +412,26 @@ const runSequentialBackgroundJobs = async (options) => {
                                 });
                             }
                         }
-                        
+
                         if (filesToInsert.length > 0 && typeof dbHelper.insertEpisodeFiles === 'function') {
                             await dbHelper.insertEpisodeFiles(filesToInsert);
                             console.log(`   📦 Saved ${filesToInsert.length} episode files for ${pack.hash.substring(0, 8)}`);
                         }
                     }
-                    
+
                     packResults.push({
                         hash: pack.hash,
                         pack_name: realPackName,
                         files_count: packData.files?.length || 0
                     });
                 }
-                
+
                 // ⏱️ 4 second delay between pack resolutions (API intensive - 3 calls per pack)
                 // RD rate limits after ~15-20 rapid calls to addMagnet
                 if (i < allPacksToResolve.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 4000));
                 }
-                
+
             } catch (err) {
                 console.warn(`   ⚠️ Pack resolution failed for ${pack.hash.substring(0, 8)}: ${err.message}`);
                 // Wait longer on failure (likely rate limit) - 10 seconds
@@ -440,14 +440,14 @@ const runSequentialBackgroundJobs = async (options) => {
                 await new Promise(resolve => setTimeout(resolve, waitTime));
             }
         }
-        
+
         console.log(`   ✅ Pack resolution complete: ${packResults.length}/${packsToProcess.length} resolved${skippedPacks > 0 ? ` (${skippedPacks} deferred to next search)` : ''}`);
     }
-    
+
     console.log(`\n✅ [Sequential BG] All background jobs completed!`);
     console.log(`   - Cache results: ${cacheResults.length}`);
     console.log(`   - Pack results: ${packResults.length}`);
-    
+
     return { cacheResults, packResults };
 };
 
@@ -1646,7 +1646,7 @@ function matchMultiplePatterns(filename, patterns) {
 /**
  * Parser principale per titoli torrent (implementazione JavaScript di @viren070/parse-torrent-title)
  * Basato su: https://github.com/clement-escolano/parse-torrent-title
- * 
+ *
  * @param {string} filename - Nome del file/torrent da parsare
  * @returns {Object} Oggetto con tutti i campi estratti
  */
@@ -5090,7 +5090,7 @@ function isExactEpisodeMatch(torrentTitle, showTitleOrTitles, seasonNum, episode
 
                 console.log(`🔍 [ANIME RANGE] Found range: ${startEp}-${endEp}`);
 
-                // ✅ STRICT VALIDATION: 
+                // ✅ STRICT VALIDATION:
                 // 1. Start must be less than end
                 // 2. Range must be reasonable (≤300 episodes per pack)
                 // 3. Reject year ranges (e.g., 1999-2011)
@@ -6215,19 +6215,6 @@ async function handleStream(type, id, config, workerOrigin) {
 
                     // PRIORITY 2: Search regular torrents (single movies or packs via all_imdb_ids)
                     const regularResults = await dbHelper.searchByImdbId(mediaDetails.imdbId, type, selectedProviders);
-
-                    // 🔧 FIX: For multi-film packs (all_imdb_ids has multiple entries), REMOVE file_index
-                    // The file_index in torrents table is from a DIFFERENT movie in the pack
-                    // These packs need dynamic resolution via resolveMoviePackFile
-                    for (const result of regularResults) {
-                        if (result.all_imdb_ids && Array.isArray(result.all_imdb_ids) && result.all_imdb_ids.length > 1) {
-                            if (result.file_index !== null && result.file_index !== undefined) {
-                                if (DEBUG_MODE) console.log(`🔧 [PACK FIX] Removing stale file_index=${result.file_index} from multi-film pack ${result.info_hash?.substring(0, 8)}`);
-                                result.file_index = null;
-                                result.file_title = null;
-                            }
-                        }
-                    }
 
                     // Merge: packs first (with file_index), then regular
                     dbResults = [...(packResults || []), ...regularResults];
@@ -7713,17 +7700,17 @@ async function handleStream(type, id, config, workerOrigin) {
                             result.fileIndex = existing.fileIndex;
                             if (DEBUG_MODE) console.log(`🔄 [Dedup] Preserved file_title: ${existing.file_title}`);
                         }
-                        
+
                         // 🔧 FIX: Choose the BEST title between existing and new
                         // Priority: pack title (no .mkv) > complete title > truncated title
                         const isVideoFilename = (t) => t && /\.(mkv|mp4|avi|mov|m4v|ts)$/i.test(t);
                         const isTruncated = (t) => t && t.endsWith('...');
-                        
+
                         const existingIsFilename = isVideoFilename(existing.title);
                         const newIsFilename = isVideoFilename(result.title);
                         const existingTruncated = isTruncated(existing.title);
                         const newTruncated = isTruncated(result.title);
-                        
+
                         // Prefer pack title (no .mkv) over episode filename (.mkv)
                         if (newIsFilename && !existingIsFilename && !existingTruncated) {
                             // New is episode filename, existing is pack title - keep existing title
@@ -7737,7 +7724,7 @@ async function handleStream(type, id, config, workerOrigin) {
                             if (DEBUG_MODE) console.log(`🔧 [Dedup] Preserved complete title: "${existing.title}" (new was truncated)`);
                             result.title = existing.title;
                         }
-                        
+
                         bestResults.set(hash, result);
                     } else {
                         if (DEBUG_MODE) console.log(`⏭️  [Dedup] SKIP hash ${hash.substring(0, 8)}...: "${result.title}" (keeping "${existing.title}")`);
@@ -7748,16 +7735,16 @@ async function handleStream(type, id, config, workerOrigin) {
                             bestResults.set(hash, existing); // Update map with modified object
                             if (DEBUG_MODE) console.log(`⏭️  [Dedup] Added file_title from skipped: ${result.file_title}`);
                         }
-                        
+
                         // 🔧 FIX: Choose the BEST title between existing and new
                         const isVideoFilename = (t) => t && /\.(mkv|mp4|avi|mov|m4v|ts)$/i.test(t);
                         const isTruncated = (t) => t && t.endsWith('...');
-                        
+
                         const existingIsFilename = isVideoFilename(existing.title);
                         const newIsFilename = isVideoFilename(result.title);
                         const existingTruncated = isTruncated(existing.title);
                         const newTruncated = isTruncated(result.title);
-                        
+
                         // If existing is episode filename and new has pack title, use pack title
                         if (existingIsFilename && !newIsFilename && !newTruncated) {
                             if (DEBUG_MODE) console.log(`🔧 [Dedup] Updated to pack title: "${existing.title}" -> "${result.title}"`);
@@ -7836,33 +7823,33 @@ async function handleStream(type, id, config, workerOrigin) {
                                 // (Actual pack resolution now happens in runSequentialBackgroundJobs)
                             })
                             .catch(err => console.warn(`⚠️ [DB] Background save failed: ${err.message}`));
-                        
+
                         // 🔧 ACCUMULATE: Add packs for later sequential resolution
                         if (type === 'series' && (config.rd_key || config.torbox_key)) {
                             const packCandidates = results.filter(r => {
                                 // Skip if no hash or already in the queue
                                 if (!r.infoHash) return false;
-                                
+
                                 const title = r.title || r.websiteTitle || '';
                                 const rawDesc = r.rawDescription || '';
-                                
+
                                 // Check 1: Title looks like a pack
                                 if (packFilesHandler.isSeasonPack(title)) return true;
-                                
+
                                 // Check 2: For external addons, check rawDescription (might contain pack info)
                                 if (r.externalAddon && rawDesc && packFilesHandler.isSeasonPack(rawDesc)) return true;
-                                
+
                                 // Check 3: If filename ends with .mkv/.mp4 but rawDescription contains S05, it's likely a pack
                                 const hasVideoExt = /\.(mkv|mp4|avi|mov)$/i.test(title);
                                 const descHasSeasonPack = /S\d{1,2}(?![eExX])|[Ss]eason\s*\d+(?!\s*[eE]pisode)|[Ss]tagione\s*\d+(?!\s*[eE]pisodio)/i.test(rawDesc);
                                 if (hasVideoExt && descHasSeasonPack) return true;
-                                
+
                                 // Check 4: potentialPack flag from external addon normalization
                                 if (r.potentialPack === true) return true;
-                                
+
                                 return false;
                             });
-                            
+
                             for (const pack of packCandidates) {
                                 backgroundPackItems.push({
                                     hash: pack.infoHash.toLowerCase(),
@@ -8436,8 +8423,8 @@ async function handleStream(type, id, config, workerOrigin) {
                     }
 
                     // Combined
-                    // Note: We do NOT exclude skipped movies (unlike series packs) because 
-                    // for movies, "unverified" usually just means "we didn't check inside", 
+                    // Note: We do NOT exclude skipped movies (unlike series packs) because
+                    // for movies, "unverified" usually just means "we didn't check inside",
                     // but likely it IS the movie itself (single file).
                     // We only exclude if we POSITIVELY identified it as a pack missing the file.
                     filteredResults = [...verifiedMovies, ...newlyVerified, ...skipped];
@@ -8865,7 +8852,7 @@ async function handleStream(type, id, config, workerOrigin) {
                             .filter(t => t.status === 'downloaded')
                             .map(t => t.hash?.toLowerCase())
                     );
-                    
+
                     // ✅ Detect packs that were mis-saved with episode filename instead of pack name
                     // These need live re-check to get correct pack info
                     const SINGLE_EPISODE_FILENAME_PATTERN = /S\d{1,2}E\d{1,3}[^-–\d].*\.(mkv|mp4|avi|m4v)$/i;
@@ -8879,13 +8866,13 @@ async function handleStream(type, id, config, workerOrigin) {
                     if (suspectPackHashes.length > 0) {
                         console.log(`🔄 [Pack Fix] ${suspectPackHashes.length} cached torrents have single-episode filenames, will re-check`);
                     }
-                    
+
                     const uncachedHashes = hashes.filter(h => {
                         // Only skip live check if DB says cached=true (confirmed in cache)
                         // If cached=false or undefined, we should re-check
                         const isConfirmedCached = dbCachedResults[h]?.cached === true;
                         const inUserDownloaded = userDownloadedHashes.has(h);
-                        
+
                         // ✅ Also re-check packs that were mis-saved with episode filename
                         const isSuspectPack = suspectPackHashes.includes(h);
 
@@ -8945,7 +8932,7 @@ async function handleStream(type, id, config, workerOrigin) {
                                             await dbHelper.updateRdCacheStatus(liveResultsToSave, type);
                                             console.log(`💾 [DB] Saved ${liveResultsToSave.length} background live check results`);
                                         }
-                                        
+
                                         // 🔧 PACK DETECTION: If live check found packs (is_pack: true), add to queue
                                         if (type === 'series') {
                                             for (const [hash, data] of Object.entries(liveCheckResults)) {
@@ -9059,7 +9046,7 @@ async function handleStream(type, id, config, workerOrigin) {
                             .filter(t => t.download_finished === true)
                             .map(t => t.hash?.toLowerCase())
                     );
-                    
+
                     // ✅ Detect packs that were mis-saved with episode filename instead of pack name
                     // These need live re-check to get correct pack info
                     const SINGLE_EPISODE_FILENAME_PATTERN = /S\d{1,2}E\d{1,3}[^-–\d].*\.(mkv|mp4|avi|m4v)$/i;
@@ -9073,14 +9060,14 @@ async function handleStream(type, id, config, workerOrigin) {
                     if (suspectPackHashes.length > 0) {
                         console.log(`🔄 [TB Pack Fix] ${suspectPackHashes.length} cached torrents have single-episode filenames, will re-check`);
                     }
-                    
+
                     const uncachedHashes = hashes.filter(h => {
                         const isConfirmedCached = dbCachedResults[h]?.cached === true;
                         const inUserDownloaded = userDownloadedHashes.has(h);
-                        
+
                         // ✅ Also re-check packs that were mis-saved with episode filename
                         const isSuspectPack = suspectPackHashes.includes(h);
-                        
+
                         return !isConfirmedCached && !inUserDownloaded || isSuspectPack;
                     });
 
@@ -9124,7 +9111,7 @@ async function handleStream(type, id, config, workerOrigin) {
                                     // ✅ Merge into results for CURRENT response
                                     Object.assign(torboxCacheResults, liveCheckResults);
                                     console.log(`✅ [TB Live Check] ${Object.values(liveCheckResults).filter(r => r.cached).length}/${syncItems.length} cached`);
-                                    
+
                                     // 🔧 PACK DETECTION: If live check found packs (is_pack: true), add to queue
                                     if (type === 'series') {
                                         for (const [hash, data] of Object.entries(liveCheckResults)) {
@@ -9479,7 +9466,7 @@ async function handleStream(type, id, config, workerOrigin) {
                     const torboxUserTorrent = torboxUserTorrents.find(t => t.hash?.toLowerCase() === infoHashLower);
 
                     // ✅ Populate file_title from cache only for MOVIES
-                    // For series, resolveSeriesPackFile already set the correct episode file_title  
+                    // For series, resolveSeriesPackFile already set the correct episode file_title
                     // Cache returns the largest file which is wrong for series packs
                     if (type === 'movie' && !result.file_title) {
                         // Try Torbox cache first, then RD cache (cross-debrid sharing)
@@ -10256,7 +10243,7 @@ async function handleStream(type, id, config, workerOrigin) {
         // This replaces the old parallel enrichCacheBackground and resolvePackNamesInBackground calls
         if ((backgroundCacheItems.length > 0 || backgroundPackItems.length > 0) && dbHelper) {
             console.log(`\n🔄 [Sequential BG] Launching background jobs: ${backgroundCacheItems.length} cache items, ${backgroundPackItems.length} pack items`);
-            
+
             // Fire-and-forget: Don't await, don't block response
             runSequentialBackgroundJobs({
                 itemsForCacheCheck: backgroundCacheItems,
@@ -12150,7 +12137,7 @@ export default async function handler(req, res) {
                         <p>Attendi il completamento del download. Lo streaming partirà in automatico.</p>
                         <div id="status">Inizializzazione...</div>
                         <div class="progress-bar"><div id="progress"></div></div>
-                    </div> 
+                    </div>
                     <script>
                         const torrentId = '${torrentId}';
                         const statusEl = document.getElementById('status');
