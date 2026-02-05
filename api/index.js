@@ -202,11 +202,13 @@ const resolvePackNamesInBackground = async (torrents, config, mediaDetails, seas
 // Runs all background jobs in sequence to avoid rate limiting:
 // 1. Cache check (1s delay between calls)
 // 2. Pack check (2s delay between calls)
+// 2C. Rejected potential packs verification (for year-filtered movie packs)
 // 3. Save to DB (at the end)
 const runSequentialBackgroundJobs = async (options) => {
     const {
         itemsForCacheCheck,   // Array of { hash, magnet } for cache checking
         itemsForPackCheck,    // Array of { hash, title } for pack resolution
+        rejectedPotentialPacks, // Array of { hash, title, infoHash } - streams rejected by year filter but potentially packs
         config,
         dbHelper,
         type,
@@ -352,7 +354,7 @@ const runSequentialBackgroundJobs = async (options) => {
 
     if (packsToProcess.length > 0 && type === 'series') {
         const itaCount = packsToProcess.filter(p => /ita/i.test(p.title || '')).length;
-        console.log(`\n📦 [Sequential BG] Phase 2: Pack resolution (${packsToProcess.length}/${allPacksToResolve.length} packs, ${itaCount} ITA${skippedPacks > 0 ? `, ${skippedPacks} deferred to next search` : ''})`);
+        console.log(`\n📦 [Sequential BG] Phase 2: Pack resolution for SERIES (${packsToProcess.length}/${allPacksToResolve.length} packs, ${itaCount} ITA${skippedPacks > 0 ? `, ${skippedPacks} deferred to next search` : ''})`);
 
         for (let i = 0; i < packsToProcess.length; i++) {
             const pack = packsToProcess[i];
@@ -388,7 +390,7 @@ const runSequentialBackgroundJobs = async (options) => {
                         console.log(`   ⚠️ Skipped invalid pack name: "${realPackName}"`);
                     }
 
-                    // Save pack files to DB
+                    // Save pack files to DB (SERIES → files table)
                     if (packData.files && packData.files.length > 0 && dbHelper) {
                         const seasonNum = parseInt(season) || packFilesHandler.extractSeasonFromPackTitle(realPackName || pack.title) || 1;
                         const filesToInsert = [];
@@ -443,12 +445,199 @@ const runSequentialBackgroundJobs = async (options) => {
 
         console.log(`   ✅ Pack resolution complete: ${packResults.length}/${packsToProcess.length} resolved${skippedPacks > 0 ? ` (${skippedPacks} deferred to next search)` : ''}`);
     }
+    
+    // ═══════════════════════════════════════════════════════════
+    // PHASE 2B: MOVIE PACK RESOLUTION (trilogies, sagas, collections)
+    // ═══════════════════════════════════════════════════════════
+    if (packsToProcess.length > 0 && type === 'movie') {
+        const itaCount = packsToProcess.filter(p => /ita/i.test(p.title || '')).length;
+        console.log(`\n📦 [Sequential BG] Phase 2B: Pack resolution for MOVIES (${packsToProcess.length}/${allPacksToResolve.length} packs, ${itaCount} ITA${skippedPacks > 0 ? `, ${skippedPacks} deferred to next search` : ''})`);
+
+        for (let i = 0; i < packsToProcess.length; i++) {
+            const pack = packsToProcess[i];
+
+            try {
+                let packData = null;
+
+                // Try RD first
+                if (rdKey && typeof packFilesHandler.fetchFilesFromRealDebrid === 'function') {
+                    packData = await packFilesHandler.fetchFilesFromRealDebrid(pack.hash, rdKey);
+                    if (DEBUG_MODE) console.log(`   [${i + 1}/${packsToProcess.length}] RD movie pack: ${packData?.files?.length || 0} files for ${pack.hash.substring(0, 8)}`);
+                }
+
+                // Fallback to TB
+                if (!packData && tbKey && typeof packFilesHandler.fetchFilesFromTorbox === 'function') {
+                    packData = await packFilesHandler.fetchFilesFromTorbox(pack.hash, tbKey);
+                    if (DEBUG_MODE) console.log(`   [${i + 1}/${allPacksToResolve.length}] TB movie pack: ${packData?.files?.length || 0} files for ${pack.hash.substring(0, 8)}`);
+                }
+
+                if (packData) {
+                    // ✅ VALIDATE PACK NAME before saving
+                    const realPackName = packData.filename;
+                    const isValidName = rdCacheChecker.isValidPackName(realPackName);
+
+                    if (realPackName && isValidName && realPackName !== pack.title) {
+                        console.log(`   📦 Fixing movie pack name: "${pack.title?.substring(0, 30)}..." -> "${realPackName?.substring(0, 30)}..."`);
+
+                        // Update title in DB
+                        if (dbHelper && typeof dbHelper.updateTorrentTitle === 'function') {
+                            await dbHelper.updateTorrentTitle(pack.hash, realPackName);
+                        }
+                    } else if (!isValidName) {
+                        console.log(`   ⚠️ Skipped invalid movie pack name: "${realPackName}"`);
+                    }
+
+                    // ✅ Save pack files to DB (MOVIE → pack_files table, NOT files!)
+                    if (packData.files && packData.files.length > 0 && dbHelper && typeof dbHelper.insertPackFiles === 'function') {
+                        const videoFiles = packData.files.filter(f => 
+                            packFilesHandler.isVideoFile(f.path) && f.bytes > 50 * 1024 * 1024
+                        );
+
+                        if (videoFiles.length > 0) {
+                            const packFilesToInsert = videoFiles.map(file => ({
+                                pack_hash: pack.hash.toLowerCase(),
+                                imdb_id: null, // Will be matched when user searches specific movie
+                                file_index: file.id,
+                                file_path: file.path,
+                                file_size: file.bytes || 0
+                            }));
+
+                            try {
+                                await dbHelper.insertPackFiles(packFilesToInsert);
+                                console.log(`   📦 Saved ${packFilesToInsert.length} movie pack files for ${pack.hash.substring(0, 8)}`);
+                            } catch (packErr) {
+                                console.warn(`   ⚠️ Failed to save movie pack files: ${packErr.message}`);
+                            }
+                        }
+                    }
+
+                    packResults.push({
+                        hash: pack.hash,
+                        pack_name: realPackName,
+                        files_count: packData.files?.length || 0
+                    });
+                }
+
+                // ⏱️ 4 second delay between pack resolutions
+                if (i < allPacksToResolve.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                }
+
+            } catch (err) {
+                console.warn(`   ⚠️ Movie pack resolution failed for ${pack.hash.substring(0, 8)}: ${err.message}`);
+                const is429 = err.message?.includes('429');
+                const waitTime = is429 ? 10000 : 4000;
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        }
+
+        console.log(`   ✅ Movie pack resolution complete: ${packResults.length}/${packsToProcess.length} resolved`);
+    }
+
+    // PHASE 2C: REJECTED POTENTIAL PACKS VERIFICATION
+    // ═══════════════════════════════════════════════════════════
+    // These are streams rejected by the year filter that might be movie packs
+    // (trilogies, sagas, collections with year ranges like 1985-1990)
+    const rejectedPacksResults = [];
+    if (rejectedPotentialPacks && rejectedPotentialPacks.length > 0 && type === 'movie') {
+        console.log(`\n🔍 [Sequential BG] Phase 2C: Verifying ${rejectedPotentialPacks.length} potential packs rejected by year filter`);
+
+        for (let i = 0; i < rejectedPotentialPacks.length; i++) {
+            const rejected = rejectedPotentialPacks[i];
+            const hash = rejected.infoHash || rejected.hash;
+
+            if (!hash) {
+                console.log(`   [${i + 1}/${rejectedPotentialPacks.length}] ⚠️ No hash found, skipping`);
+                continue;
+            }
+
+            try {
+                // Check if we already have this pack in DB
+                if (dbHelper && typeof dbHelper.getPackFiles === 'function') {
+                    const existingPack = await dbHelper.getPackFiles(hash);
+                    if (existingPack && existingPack.length > 0) {
+                        if (DEBUG_MODE) console.log(`   [${i + 1}/${rejectedPotentialPacks.length}] ⏭️ Pack ${hash.substring(0, 8)} already in DB, skipping`);
+                        continue;
+                    }
+                }
+
+                // Use fetchFilesFromAnySource with full fallback chain (RD → TB → Public Cache)
+                let packData = null;
+                if (typeof packFilesHandler.fetchFilesFromAnySource === 'function') {
+                    packData = await packFilesHandler.fetchFilesFromAnySource(hash, config);
+                } else {
+                    // Fallback to direct RD/TB if new function not available
+                    if (rdKey && typeof packFilesHandler.fetchFilesFromRealDebrid === 'function') {
+                        packData = await packFilesHandler.fetchFilesFromRealDebrid(hash, rdKey);
+                    }
+                    if (!packData && tbKey && typeof packFilesHandler.fetchFilesFromTorbox === 'function') {
+                        packData = await packFilesHandler.fetchFilesFromTorbox(hash, tbKey);
+                    }
+                }
+
+                if (packData && packData.files) {
+                    // Filter only video files > 50MB
+                    const videoFiles = packData.files.filter(f => 
+                        packFilesHandler.isVideoFile(f.path) && f.bytes > 50 * 1024 * 1024
+                    );
+
+                    if (videoFiles.length > 1) {
+                        // ✅ It's a real pack with multiple movies!
+                        const packName = packData.filename || rejected.title;
+                        console.log(`   [${i + 1}/${rejectedPotentialPacks.length}] ✅ Confirmed pack: "${packName?.substring(0, 40)}..." with ${videoFiles.length} movies`);
+
+                        // Save pack files to DB
+                        if (dbHelper && typeof dbHelper.insertPackFiles === 'function') {
+                            const packFilesToInsert = videoFiles.map(file => ({
+                                pack_hash: hash.toLowerCase(),
+                                imdb_id: null, // Will be matched when user searches specific movie
+                                file_index: file.id,
+                                file_path: file.path,
+                                file_size: file.bytes || 0
+                            }));
+
+                            try {
+                                await dbHelper.insertPackFiles(packFilesToInsert);
+                                console.log(`   📦 Saved ${packFilesToInsert.length} pack files for ${hash.substring(0, 8)}`);
+                                rejectedPacksResults.push({
+                                    hash: hash,
+                                    pack_name: packName,
+                                    files_count: videoFiles.length,
+                                    source: packData.source || 'unknown'
+                                });
+                            } catch (packErr) {
+                                console.warn(`   ⚠️ Failed to save pack files: ${packErr.message}`);
+                            }
+                        }
+                    } else {
+                        if (DEBUG_MODE) console.log(`   [${i + 1}/${rejectedPotentialPacks.length}] ❌ Not a pack: only ${videoFiles.length} video file(s)`);
+                    }
+                } else {
+                    if (DEBUG_MODE) console.log(`   [${i + 1}/${rejectedPotentialPacks.length}] ❌ Could not fetch files for ${hash.substring(0, 8)}`);
+                }
+
+                // ⏱️ 4 second delay between checks
+                if (i < rejectedPotentialPacks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                }
+
+            } catch (err) {
+                console.warn(`   ⚠️ Rejected pack verification failed for ${hash?.substring(0, 8)}: ${err.message}`);
+                const is429 = err.message?.includes('429');
+                const waitTime = is429 ? 10000 : 4000;
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        }
+
+        console.log(`   ✅ Rejected packs verification complete: ${rejectedPacksResults.length}/${rejectedPotentialPacks.length} confirmed as packs`);
+    }
 
     console.log(`\n✅ [Sequential BG] All background jobs completed!`);
     console.log(`   - Cache results: ${cacheResults.length}`);
     console.log(`   - Pack results: ${packResults.length}`);
+    console.log(`   - Rejected packs verified: ${rejectedPacksResults.length}`);
 
-    return { cacheResults, packResults };
+    return { cacheResults, packResults, rejectedPacksResults };
 };
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
@@ -5770,6 +5959,7 @@ async function handleStream(type, id, config, workerOrigin) {
         // This replaces parallel fire-and-forget calls with a sequential approach
         const backgroundCacheItems = [];   // { hash, magnet } for cache checking
         const backgroundPackItems = [];    // { hash, title } for pack resolution
+        const backgroundRejectedPacks = []; // { hash, title, infoHash } for Phase 2C - potential movie packs rejected by year filter
 
         // ✅ GLOBAL CACHE HIT: Load data from cache, skip search
         if (fromGlobalCache && cachedData) {
@@ -8087,6 +8277,11 @@ async function handleStream(type, id, config, workerOrigin) {
                 if (mediaDetails.tmdbId) {
                     movieDetails = await getTMDBDetails(mediaDetails.tmdbId, 'movie', tmdbKey);
                 }
+
+                // 🔍 PHASE 2C SUPPORT: Collect potential packs rejected by year filter
+                // These will be verified in background to discover movie trilogies/sagas
+                const rejectedPotentialPacks = [];
+
                 filteredResults = filteredResults.filter(result => {
                     // 📦 For pack files with fileIndex, use file_title for matching
                     const hasPackFile = result.fileIndex !== null && result.fileIndex !== undefined && result.file_title;
@@ -8134,15 +8329,39 @@ async function handleStream(type, id, config, workerOrigin) {
 
                     // Try matching with original title
                     if (movieDetails && movieDetails.original_title && movieDetails.original_title !== mediaDetails.title) {
-                        return isExactMovieMatch(
+                        const originalMatch = isExactMovieMatch(
                             torrentTitle,
                             movieDetails.original_title,
                             mediaDetails.year
                         );
+                        if (originalMatch) return true;
                     }
+
+                    // 🔍 REJECTED: Check if it could be a potential movie pack (for Phase 2C)
+                    // Only collect if we have isPotentialMoviePack function available
+                    if (typeof packFilesHandler.isPotentialMoviePack === 'function') {
+                        const potentialCheck = packFilesHandler.isPotentialMoviePack(result, torrentTitle);
+                        if (potentialCheck.isPotentialPack) {
+                            const hash = result.infoHash || result.hash;
+                            if (hash) {
+                                rejectedPotentialPacks.push({
+                                    hash: hash,
+                                    infoHash: hash,
+                                    title: torrentTitle,
+                                    reason: potentialCheck.reason,
+                                    originalResult: result
+                                });
+                                if (DEBUG_MODE) console.log(`🔍 [Potential Pack] Collected for Phase 2C: ${torrentTitle.substring(0, 50)}... (${potentialCheck.reason})`);
+                            }
+                        }
+                    }
+
                     return false;
                 });
-                if (DEBUG_MODE) console.log(`🎬 Movie filtering: ${filteredResults.length} of ${originalCount} results match`);
+                if (DEBUG_MODE) console.log(`🎬 Movie filtering: ${filteredResults.length} of ${originalCount} results match (${rejectedPotentialPacks.length} potential packs collected)`);
+
+                // Store rejectedPotentialPacks for background processing (Phase 2C)
+                backgroundRejectedPacks.push(...rejectedPotentialPacks);
 
                 // If exact matching removed too many results, be more lenient
                 if (filteredResults.length === 0 && originalCount > 0) {
@@ -10223,13 +10442,14 @@ async function handleStream(type, id, config, workerOrigin) {
 
         // 🔄 LAUNCH SEQUENTIAL BACKGROUND JOBS (fire-and-forget)
         // This replaces the old parallel enrichCacheBackground and resolvePackNamesInBackground calls
-        if ((backgroundCacheItems.length > 0 || backgroundPackItems.length > 0) && dbHelper) {
-            console.log(`\n🔄 [Sequential BG] Launching background jobs: ${backgroundCacheItems.length} cache items, ${backgroundPackItems.length} pack items`);
+        if ((backgroundCacheItems.length > 0 || backgroundPackItems.length > 0 || backgroundRejectedPacks.length > 0) && dbHelper) {
+            console.log(`\n🔄 [Sequential BG] Launching background jobs: ${backgroundCacheItems.length} cache items, ${backgroundPackItems.length} pack items, ${backgroundRejectedPacks.length} rejected packs`);
 
             // Fire-and-forget: Don't await, don't block response
             runSequentialBackgroundJobs({
                 itemsForCacheCheck: backgroundCacheItems,
                 itemsForPackCheck: backgroundPackItems,
+                rejectedPotentialPacks: backgroundRejectedPacks,
                 config,
                 dbHelper,
                 type,
@@ -10237,7 +10457,7 @@ async function handleStream(type, id, config, workerOrigin) {
                 season,
                 episode
             }).then(result => {
-                console.log(`✅ [Sequential BG] Completed: ${result?.cacheResults?.length || 0} cache, ${result?.packResults?.length || 0} packs`);
+                console.log(`✅ [Sequential BG] Completed: ${result?.cacheResults?.length || 0} cache, ${result?.packResults?.length || 0} packs, ${result?.rejectedPacksResults?.length || 0} verified from rejected`);
             }).catch(err => {
                 console.error(`❌ [Sequential BG] Error: ${err.message}`);
             });
