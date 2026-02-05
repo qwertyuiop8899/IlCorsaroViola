@@ -900,22 +900,6 @@ async function updateTorrentFileInfo(infoHash, fileIndex, filePath, fileSize = n
 }
 
 /**
- * Delete all file entries for a specific torrent hash
- * Used when re-adding a torrent to clean up old file selections
- */
-async function deleteFileInfo(infoHash) {
-  try {
-    const query = `DELETE FROM files WHERE info_hash = $1`;
-    const res = await pool.query(query, [infoHash.toLowerCase()]);
-    if (DEBUG_MODE) console.log(`✅ [DB] Deleted ${res.rowCount} file entries for hash ${infoHash}`);
-    return res.rowCount;
-  } catch (error) {
-    console.error(`❌ [DB] Error deleting file info:`, error.message);
-    return 0;
-  }
-}
-
-/**
  * Update rd_link_index for a specific file
  * This saves the verified RD link index to avoid repeated API calls
  * @param {string} infoHash - Torrent info hash
@@ -1682,29 +1666,6 @@ async function searchFilesByTitle(titleQuery, providers = null, options = {}) {
   }
 }
 
-/**
- * Delete all pack files cache for a specific infoHash
- * Used to clear corrupted cache entries
- * @param {string} infoHash - InfoHash of the pack
- * @returns {Promise<number>} Number of deleted rows
- */
-async function deletePackFilesCache(infoHash) {
-  if (!pool) throw new Error('Database not initialized');
-
-  try {
-    const hashLower = infoHash.toLowerCase();
-    const result = await pool.query(
-      'DELETE FROM pack_files WHERE pack_hash = $1',
-      [hashLower]
-    );
-    console.log(`🗑️ [DB] Deleted ${result.rowCount} cached files for pack ${infoHash.substring(0, 8)}`);
-    return result.rowCount;
-  } catch (error) {
-    console.error(`❌ [DB] Error deleting pack cache: ${error.message}`);
-    return 0;
-  }
-}
-
 // ============================================================================
 // 🌐 GLOBAL TORRENT SEARCH CACHE - Persistent cache shared across all users
 // ============================================================================
@@ -1853,7 +1814,6 @@ module.exports = {
   refreshTbCacheTimestamp,
   batchInsertTorrents,
   updateTorrentFileInfo,
-  deleteFileInfo,
   updateRdLinkIndex,
   updateRdLinkIndexForPack,
   getImdbIdByHash,
@@ -1867,8 +1827,6 @@ module.exports = {
   insertEpisodeFiles,
   closeDatabase,
   searchFilesByTitle,
-  deletePackFilesCache,
-  // 🌐 Global Torrent Search Cache
   getTorrentSearchCache,
   setTorrentSearchCache,
   cleanupTorrentSearchCache
