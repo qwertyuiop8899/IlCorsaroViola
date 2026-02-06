@@ -241,8 +241,8 @@ async function fetchFilesFromTorbox(infoHash, torboxKey) {
                 const sortedFiles = [...rawFiles].sort((a, b) => (a.name || a.path || '').localeCompare(b.name || b.path || ''));
 
                 const files = sortedFiles.map((f, idx) => ({
-                    id: idx,
-                    path: f.name || f.path || `file_${idx}`,
+                    id: idx + 1, // ✅ FIX: 1-based to match RD
+                    path: f.short_name || (f.name || '').split('/').pop() || `file_${idx}`, // ✅ FIX: Use short_name (clean) or extract filename from path
                     bytes: f.size || 0,
                     selected: 1
                 }));
@@ -360,10 +360,10 @@ function parseTorrentFile(base64Data) {
     if (info.files) {
         info.files.forEach((f, idx) => {
             const path = Array.isArray(f.path) ? f.path.join('/') : f.path;
-            files.push({ id: idx, path: torrentName + '/' + path, bytes: f.length });
+            files.push({ id: idx + 1, path: path, bytes: f.length }); // ✅ FIX: 1-based ID, clean path (no folder prefix)
         });
     } else {
-        files.push({ id: 0, path: info.name, bytes: info.length });
+        files.push({ id: 1, path: info.name, bytes: info.length }); // ✅ FIX: 1-based
     }
 
     return { infoHash, files, filename: torrentName };
@@ -390,6 +390,7 @@ async function fetchTorrentFromPublicCaches(infoHash) {
             const response = await axios.get(url, {
                 responseType: 'arraybuffer',
                 timeout: 8000,
+                maxRedirects: 5, // ✅ FIX: Follow redirects (itorrents.org returns 301)
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 }
@@ -732,13 +733,18 @@ function isMoviePack(torrentTitle) {
 /**
  * Checks if a torrent might be a pack based on external stream info
  * Uses fileIdx, patterns, etc. to determine if background verification is needed
- * @param {Object} stream - Stream object from external addon
+ * @param {Object} stream - Stream object from external addon or DB
  * @param {string} streamTitle - Title/filename from stream
  * @returns {{isPotentialPack: boolean, reason: string}}
  */
 function isPotentialMoviePack(stream, streamTitle) {
-    // 1. fileIdx present means addon already identified it as a pack file
-    if (stream.fileIdx !== undefined && stream.fileIdx !== null) {
+    // 1. fileIdx/fileIndex present means addon already identified it as a pack file
+    //    - fileIdx: from external addons (Comet, Torrentio)
+    //    - fileIndex: from our DB
+    const hasFileIdx = stream.fileIdx !== undefined && stream.fileIdx !== null;
+    const hasFileIndex = stream.fileIndex !== undefined && stream.fileIndex !== null;
+    
+    if (hasFileIdx || hasFileIndex) {
         return { isPotentialPack: true, reason: 'fileIdx present' };
     }
     
@@ -848,24 +854,7 @@ async function resolveMoviePackFile(infoHash, config, movieImdbId, targetTitles,
         if (fetchedData && fetchedData.files) {
             videoFiles = fetchedData.files.filter(f => isVideoFile(f.path) && f.bytes > 25 * 1024 * 1024);
             totalPackSize = fetchedData.files.reduce((acc, f) => acc + f.bytes, 0);
-
-            // 🔧 FIX: Save ALL pack files to DB for future lookups (fixes corrupted cache)
-            if (dbHelper && typeof dbHelper.insertPackFiles === 'function' && videoFiles.length > 1) {
-                try {
-                    console.log(`📦 [PACK-HANDLER] Saving ${videoFiles.length} pack files to DB...`);
-                    const packFilesData = videoFiles.map(f => ({
-                        pack_hash: infoHash.toLowerCase(),
-                        imdb_id: null, // Will be filled when matched
-                        file_index: f.id,
-                        file_path: f.path,
-                        file_size: f.bytes || 0
-                    }));
-                    await dbHelper.insertPackFiles(packFilesData);
-                    console.log(`✅ [PACK-HANDLER] Saved ${videoFiles.length} pack files to DB`);
-                } catch (dbErr) {
-                    console.warn(`⚠️ [PACK-HANDLER] DB save error (non-critical): ${dbErr.message}`);
-                }
-            }
+            // ✅ FIX: Don't save here - save ONCE after matching with correct IMDb IDs
         }
     }
 
@@ -875,11 +864,28 @@ async function resolveMoviePackFile(infoHash, config, movieImdbId, targetTitles,
     // No need to reorder - the fetch functions return correct indices
     console.log(`📊 [PACK-HANDLER] Using ORIGINAL file indices for movie pack`);
 
+    // ✅ FIX: Get pack title from DB (the CORRECT title, not from external addon)
+    let packTitle = null;
+    if (dbHelper && typeof dbHelper.getTorrent === 'function') {
+        try {
+            const torrentRecord = await dbHelper.getTorrent(infoHash);
+            if (torrentRecord && torrentRecord.title) {
+                packTitle = torrentRecord.title;
+                console.log(`📦 [PACK-HANDLER] Got pack title from DB: "${packTitle.substring(0, 50)}..."`);
+            }
+        } catch (e) {
+            console.warn(`⚠️ [PACK-HANDLER] Failed to get pack title from DB: ${e.message}`);
+        }
+    }
+
     // If <= 1 video file, it's not really a pack to filter, but we return it as "verified"
     if (videoFiles.length === 1) {
         console.log(`ℹ️ [PACK-HANDLER] Single video file found. Assuming it's the movie.`);
         const f = videoFiles[0];
         const correctIndex = f.id; // Use original index directly
+        // ✅ FIX: Clean path - extract just filename
+        const cleanFilename = f.path.replace(/^\/+/, '').split('/').pop() || f.path;
+        
         // Save to pack_files (NOT files table - that's for series only)
         if (dbHelper && movieImdbId && typeof dbHelper.insertPackFiles === 'function') {
             try {
@@ -887,7 +893,7 @@ async function resolveMoviePackFile(infoHash, config, movieImdbId, targetTitles,
                     pack_hash: infoHash.toLowerCase(),
                     imdb_id: movieImdbId,
                     file_index: correctIndex,
-                    file_path: f.path,
+                    file_path: cleanFilename,
                     file_size: f.bytes || 0
                 }]);
             } catch (e) {
@@ -896,10 +902,11 @@ async function resolveMoviePackFile(infoHash, config, movieImdbId, targetTitles,
         }
         return {
             fileIndex: correctIndex,
-            fileName: f.path.split('/').pop(),
+            fileName: cleanFilename,
             fileSize: f.bytes,
             source: "debrid_api",
-            totalPackSize
+            totalPackSize,
+            packTitle  // ✅ Return pack title from DB
         };
     }
 
@@ -912,13 +919,20 @@ async function resolveMoviePackFile(infoHash, config, movieImdbId, targetTitles,
         // Save to DB - ONLY use pack_files for movie packs (NOT files table)
         if (dbHelper && typeof dbHelper.insertPackFiles === 'function') {
             try {
-                // ✅ FIX: Save ALL pack files to pack_files table (not files table!)
-                // files table is for SERIES episodes only
+                // ✅ FIX: Save ALL pack files with CLEAN filenames (no folder prefix)
+                // Extract just the filename from path like "FolderName/file.mkv" or "/file.mkv"
+                const cleanPath = (p) => {
+                    if (!p) return 'unknown.mkv';
+                    // Remove leading slashes and get just the filename
+                    const cleaned = p.replace(/^\/+/, '');
+                    return cleaned.includes('/') ? cleaned.split('/').pop() : cleaned;
+                };
+
                 const allPackFilesToSave = videoFiles.map(f => ({
                     pack_hash: infoHash.toLowerCase(),
                     imdb_id: (f.id === match.id) ? movieImdbId : null,
                     file_index: f.id,
-                    file_path: f.path,
+                    file_path: cleanPath(f.path), // ✅ Only filename, no folder
                     file_size: f.bytes || 0
                 }));
 
@@ -935,7 +949,8 @@ async function resolveMoviePackFile(infoHash, config, movieImdbId, targetTitles,
             fileName: match.path.split('/').pop(),
             fileSize: match.bytes,
             source: 'debrid_api',
-            totalPackSize
+            totalPackSize,
+            packTitle  // ✅ Return pack title from DB
         };
     } else {
         console.log(`❌ [PACK-HANDLER] Movie "${JSON.stringify(targetTitles)}" not found in pack.`);
@@ -958,15 +973,78 @@ function findMovieFile(files, targetTitles, targetYear) {
     // Clean function
     const cleanTitle = (t) => t.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
 
+    // ✅ FIX: Extract sequel number from title more carefully
+    // Only match: "Part II", "Part 2", "Parte II", "Parte 2", standalone "2", "II", "III" etc
+    // EXCLUDE years like 1985, 1989, 2023
+    const extractSequelNumber = (str) => {
+        const s = str.toLowerCase();
+        
+        // Pattern 1: "Part II", "Part 2", "Parte II", "Parte 2"
+        const partMatch = s.match(/\b(?:part|parte)\s*([ivx]+|\d)\b/i);
+        if (partMatch) {
+            const num = partMatch[1].toLowerCase();
+            if (num === 'i') return 1;
+            if (num === 'ii') return 2;
+            if (num === 'iii') return 3;
+            if (num === 'iv') return 4;
+            if (num === 'v') return 5;
+            if (num === 'vi') return 6;
+            const parsed = parseInt(num);
+            if (parsed >= 1 && parsed <= 10) return parsed;
+        }
+        
+        // Pattern 2: Standalone number 1-9 NOT preceded by year pattern
+        // e.g. "Frozen 2", "Shrek 3", "Back to the Future 1"
+        // But NOT "Back to the Future (1985)" or "2160p"
+        const standaloneMatch = s.match(/(?<!\d)(?<![\(\[])\b([1-9])\b(?![0-9pki])/);
+        if (standaloneMatch) {
+            return parseInt(standaloneMatch[1]);
+        }
+        
+        // Pattern 3: Roman numerals standalone (not part of resolution like "IV" in random text)
+        const romanMatch = s.match(/\b(ii|iii|iv|v|vi)\b/);
+        if (romanMatch) {
+            const num = romanMatch[1];
+            if (num === 'ii') return 2;
+            if (num === 'iii') return 3;
+            if (num === 'iv') return 4;
+            if (num === 'v') return 5;
+            if (num === 'vi') return 6;
+        }
+        
+        return null;
+    };
+
     let bestMatch = null;
     let maxScore = 0;
 
+    // Get sequel number from target titles
+    const targetSequelNumbers = titles.map(t => extractSequelNumber(t)).filter(n => n !== null);
+    const targetSequelNumber = targetSequelNumbers.length > 0 ? targetSequelNumbers[0] : null;
+
     // Debug logging for titles
-    console.log(`🔍 [FUZZY MATCH] Checking against ${titles.length} titles: ${JSON.stringify(titles)}`);
+    console.log(`🔍 [FUZZY MATCH] Checking against ${titles.length} titles: ${JSON.stringify(titles)}${targetSequelNumber ? ` (sequel #${targetSequelNumber})` : ''}`);
 
     for (const file of files) {
         const filename = file.path.split('/').pop().toLowerCase();
         let bestTitleScoreForFile = 0;
+
+        // ✅ FIX: Check sequel number - but treat null as potential match for "1"
+        const fileSequelNumber = extractSequelNumber(filename);
+        
+        // Sequel matching logic:
+        // - If target has no sequel (null) and file has "1" → MATCH (first film)
+        // - If target has no sequel (null) and file has "2"/"3" → SKIP
+        // - If target has sequel N and file has N → MATCH
+        // - If target has sequel N and file has different → SKIP
+        const isSequelMatch = 
+            (targetSequelNumber === null && (fileSequelNumber === null || fileSequelNumber === 1)) ||
+            (targetSequelNumber !== null && fileSequelNumber === targetSequelNumber);
+        
+        if (!isSequelMatch) {
+            console.log(`🔍 [FUZZY DEBUG] "${filename}" - sequel mismatch (file: ${fileSequelNumber || 'none'}, want: ${targetSequelNumber || 'none/1'})`);
+            continue; // Skip this file entirely for sequel mismatches
+        }
 
         // Check against EACH title variant
         for (const title of titles) {
