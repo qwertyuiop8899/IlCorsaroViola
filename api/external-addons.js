@@ -133,14 +133,29 @@ function extractOriginalProvider(text) {
 }
 
 /**
- * Estrae il pack title dal campo 📁 nel title/description
+ * Estrae il pack title dal campo 📁 nel title/description o da behaviorHints.folderName
  * Questo è il nome della cartella/pack, NON il singolo file
+ * ✅ FIX: Ignora folderName se è un filename (contiene estensione video)
  */
 function extractPackTitle(stream) {
     const text = stream.title || stream.description || '';
-    // 📁 indica il nome del PACK (cartella con più file)
+    
+    // 1. Prima prova 📁 nel testo (più affidabile)
     const match = text.match(/📁\s*([^\n]+)/);
     if (match) return match[1].trim();
+    
+    // 2. Poi prova behaviorHints.folderName - MA ignora se è un filename!
+    // Comet a volte passa il nome del FILE come folderName (bug di Comet)
+    const folderName = stream.behaviorHints?.folderName;
+    if (folderName) {
+        // ✅ FIX: Se folderName contiene estensione video, è un filename NON un folder!
+        const isFilename = /\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts)$/i.test(folderName);
+        if (!isFilename) {
+            return folderName;
+        }
+        // Se è un filename, ignoriamo e torniamo null (useremo filename invece)
+    }
+    
     return null;
 }
 
