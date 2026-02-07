@@ -982,6 +982,59 @@ async function getTorrent(infoHash) {
   }
 }
 
+/**
+ * Get is_torrent_pack flag for a torrent
+ * @param {string} infoHash - Torrent info hash
+ * @returns {Promise<boolean|null>} true if pack, false if not pack, null if unknown
+ */
+async function getIsTorrentPack(infoHash) {
+  if (!pool) return null;
+  if (!infoHash) return null;
+
+  try {
+    const query = 'SELECT is_torrent_pack FROM torrents WHERE info_hash = $1 LIMIT 1';
+    const result = await pool.query(query, [infoHash.toLowerCase()]);
+
+    if (result.rows.length > 0) {
+      return result.rows[0].is_torrent_pack; // true, false, or null
+    }
+    return null; // Torrent not in DB
+  } catch (error) {
+    console.error(`❌ [DB] Error getting is_torrent_pack:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Update is_torrent_pack flag for a torrent (ONLY this field)
+ * @param {string} infoHash - Torrent info hash
+ * @param {boolean} isPack - true if confirmed pack, false if confirmed NOT pack
+ * @returns {Promise<boolean>} Success status
+ */
+async function updateIsTorrentPack(infoHash, isPack) {
+  if (!pool) return false;
+  if (!infoHash) return false;
+  if (typeof isPack !== 'boolean') return false;
+
+  try {
+    const query = `
+      UPDATE torrents 
+      SET is_torrent_pack = $2
+      WHERE info_hash = $1
+    `;
+    const result = await pool.query(query, [infoHash.toLowerCase(), isPack]);
+
+    if (result.rowCount > 0) {
+      if (DEBUG_MODE) console.log(`✅ [DB] Updated is_torrent_pack = ${isPack} for ${infoHash.substring(0, 8)}`);
+      return true;
+    }
+    return false; // Torrent not found in DB
+  } catch (error) {
+    console.error(`❌ [DB] Error updating is_torrent_pack:`, error.message);
+    return false;
+  }
+}
+
 
 /**
  * Search torrents by title using PostgreSQL Full-Text Search (FTS)
@@ -1989,6 +2042,9 @@ module.exports = {
   closeDatabase,
   searchFilesByTitle,
   deletePackFilesCache,
+  // 🚀 Pack optimization
+  getIsTorrentPack,
+  updateIsTorrentPack,
   // 🌐 Global Torrent Search Cache
   getTorrentSearchCache,
   setTorrentSearchCache,
