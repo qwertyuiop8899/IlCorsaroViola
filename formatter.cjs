@@ -1,32 +1,32 @@
 /**
  * ICV Custom Formatter Module
- * 
+ *
  * Template parser per personalizzare nome e descrizione degli stream.
- * 
+ *
  * ============================================================================
  * CREDITS & LICENSE
  * ============================================================================
- * 
+ *
  * The custom formatter code in this file was adapted from:
  * https://github.com/Viren070/AIOStreams
- * 
+ *
  * AIOStreams - One addon to rule them all
  * Copyright (c) 2024 Viren070
  * Licensed under the MIT License
- * 
+ *
  * The original template parsing logic was adapted from:
  * https://github.com/diced/zipline/blob/trunk/src/lib/parser/index.ts
- * 
+ *
  * Copyright (c) 2023 dicedtomato
  * Licensed under the MIT License
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
  * ============================================================================
@@ -36,9 +36,9 @@
 // UTILITY FUNCTIONS
 // ============================================
 
-function formatBytes(bytes, base = 1000, round = false) {
+function formatBytes(bytes, base = 1024, round = false) {
     if (!bytes || bytes === 0) return '0 B';
-    const sizes = base === 1024 ? ['B', 'KiB', 'MiB', 'GiB', 'TiB'] : ['B', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(Math.abs(bytes)) / Math.log(base));
     const value = bytes / Math.pow(base, i);
     return (round ? Math.round(value) : value.toFixed(2)) + ' ' + sizes[i];
@@ -141,8 +141,8 @@ const numberModifiers = {
     hex: (value) => Number(value).toString(16),
     octal: (value) => Number(value).toString(8),
     binary: (value) => Number(value).toString(2),
-    bytes: (value) => formatBytes(Number(value), 1000, false),
-    rbytes: (value) => formatBytes(Number(value), 1000, true),
+    bytes: (value) => formatBytes(Number(value), 1024, false),
+    rbytes: (value) => formatBytes(Number(value), 1024, true),
     bytes10: (value) => formatBytes(Number(value), 1000, false),
     rbytes10: (value) => formatBytes(Number(value), 1000, true),
     bytes2: (value) => formatBytes(Number(value), 1024, false),
@@ -420,30 +420,30 @@ function resolveVariable(varPath, modifierString, trueValue, falseValue, data, m
 const PRESET_TEMPLATES = {
     default: {
         name: `{service.shortName::exists["[{service.shortName}] "||""]}📺 {stream.title}`,
-        description: `{stream.quality} | 💾 {stream.size::bytes} | 👤 {stream.seeders} seeders`
+        description: `{stream.quality::=Unknown[""||"{stream.quality}"]} | 💾 {stream.size::bytes} | 👤 {stream.seeders} seeders`
     },
     torrentio: {
-        name: `{service.shortName::exists["[{service.shortName}"||""]}{service.cached::istrue["+]"||"]"]} ICV {stream.quality}`,
-        description: `{stream.filename}
-💾 {stream.size::bytes} {stream.packSize::>0["/ 📦 {stream.packSize::bytes}"||""]} 👤 {stream.seeders}
-{stream.languageEmojis::join(' ')}`
+        name: `{service.shortName::exists["[{service.shortName}"||""]}{service.cached::istrue["⚡]"||"⏳]"]} IlCorsaroViola {stream.quality::=Unknown[""||"{stream.quality}"]}`,
+        description: `🎬 {stream.filename}
+{stream.size::>0["💾 {stream.size::bytes}"||""]} 👤 {stream.seeders}
+{stream.languageEmojis::join(' / ')}`
     },
     minimal: {
-        name: `{stream.quality} {stream.codec}`,
+        name: `{stream.quality::=Unknown[""||"{stream.quality}"]} {stream.codec}`,
         description: `{stream.title}
 {stream.size::bytes} • {stream.seeders} seeds`
     },
     verbose: {
-        name: `{service.cached::istrue["⚡"||"⏳"]} [{service.shortName}] {stream.quality} {stream.codec}`,
+        name: `{service.cached::istrue["⚡"||"⏳"]} [{service.shortName}] {stream.quality::=Unknown[""||"{stream.quality}"]} {stream.codec}`,
         description: `📁 {stream.filename}
 💾 Ep: {stream.size::bytes}{stream.folderName::exists[" / Pack: {stream.folderSize::bytes}"||""]}
 👤 {stream.seeders} • 🎬 {stream.source} • 🔊 {stream.audio}
 🌍 {stream.languages::join(' | ')}`
     },
     italiano: {
-        name: `{service.cached::istrue["⚡"||"⏳"]} {service.shortName::exists["[{service.shortName}]"||""]} {stream.quality} {stream.codec}`,
+        name: `{service.cached::istrue["⚡"||"⏳"]} {service.shortName::exists["[{service.shortName}]"||""]} {stream.quality::=Unknown[""||"{stream.quality}"]} {stream.codec}`,
         description: `📄 {stream.filename}
-💾 {stream.size::bytes}
+💾 {stream.size::bytes} {stream.folderName::exists["/ 📦 {stream.folderSize::bytes}"||""]}
 🌍 {stream.languageEmojis::join(' ')} | 👤 {stream.seeders} | ⏰ {stream.age}
 🎬 {stream.source} | 🔊 {stream.audio} | 🏷️ {stream.releaseGroup::exists["{stream.releaseGroup}"||"N/A"]}`
     },
@@ -470,9 +470,9 @@ const PRESET_TEMPLATES = {
     },
     and: {
         name: `{stream.title::exists["🎬 {stream.title}"||""]} S{stream.season}E{stream.episode}`,
-        description: `{stream.quality} {service.cached::istrue["/⚡"||"/⏳"]}
+        description: `{stream.quality::=Unknown[""||"{stream.quality}"]} {service.cached::istrue["/⚡"||"/⏳"]}
 ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-{stream.languageEmojis::exists["Lingue: {stream.languageEmojis::join(' | ')} "||""]}Specifiche: {stream.quality}{stream.visualTags::exists["| 📺 {stream.visualTags::join(' ')}"||""]} {stream.audioTags::exists["| 🔊 {stream.audioTags::join(', ')}"||""]}
+{stream.languageEmojis::exists["Lingue: {stream.languageEmojis::join(' | ')} "||""]}Specifiche: {stream.quality::=Unknown[""||"{stream.quality}"]}{stream.visualTags::exists["| 📺 {stream.visualTags::join(' ')}"||""]} {stream.audioTags::exists["| 🔊 {stream.audioTags::join(', ')}"||""]}
 ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
 📂 {stream.size::>0["{stream.size::bytes}"||""]}{service.name::exists[" | ☁️ {service.name}"||""]}{addon.name::exists[" | 🛰️ {addon.name}"||""]}`
     },
