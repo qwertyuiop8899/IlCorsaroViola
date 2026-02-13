@@ -505,9 +505,20 @@ const runSequentialBackgroundJobs = async (options) => {
                     const bestTitleData = getBestTitle(realPackName);
                     const finalTitle = bestTitleData.title;
 
-                    if (finalTitle && finalTitle !== pack.title) {
+                    // ✅ FIX: Read ACTUAL DB title (pack.title is the scraper title, NOT the DB title)
+                    let dbTitle = pack.title;
+                    if (dbHelper && typeof dbHelper.getTorrent === 'function') {
+                        try {
+                            const dbRecord = await dbHelper.getTorrent(pack.hash);
+                            if (dbRecord && dbRecord.title) {
+                                dbTitle = dbRecord.title;
+                            }
+                        } catch (e) { /* use pack.title as fallback */ }
+                    }
+
+                    if (finalTitle && finalTitle !== dbTitle) {
                         // ✅ CONSERVATIVE UPDATE LOGIC (Sequential Job Version)
-                        const curr = (pack.title || '').toLowerCase();
+                        const curr = (dbTitle || '').toLowerCase();
                         const next = (finalTitle || '').toLowerCase();
                         let shouldUpdate = false;
 
@@ -529,19 +540,19 @@ const runSequentialBackgroundJobs = async (options) => {
                                 } else {
                                     // Series: Update if missing Season Info (unless generic RD pattern)
                                     const hasSeason = /s\d+|season|stagion|complete|episod/i.test(curr);
-                                    const isGenericRD = /^[\w\s]+\s*\[\d{4}[-–]\d{4}\]$/.test(pack.title.trim());
+                                    const isGenericRD = /^[\w\s]+\s*\[\d{4}[-–]\d{4}\]$/.test(dbTitle.trim());
                                     if (!hasSeason || isGenericRD) shouldUpdate = true;
                                 }
                             }
                         }
 
                         if (shouldUpdate) {
-                            console.log(`   📦 [BG-FIX] Updating title: "${pack.title?.substring(0, 30)}..." -> "${finalTitle.substring(0, 50)}..." (Source: ${bestTitleData.source})`);
+                            console.log(`   📦 [BG-FIX] Updating title: "${dbTitle?.substring(0, 30)}..." -> "${finalTitle.substring(0, 50)}..." (Source: ${bestTitleData.source})`);
                             if (dbHelper && typeof dbHelper.updateTorrentTitle === 'function') {
                                 await dbHelper.updateTorrentTitle(pack.hash, finalTitle);
                             }
                         } else {
-                            console.log(`   ⏭️ [BG-FIX] Keeping better/equivalent title: "${pack.title?.substring(0, 30)}..."`);
+                            console.log(`   ⏭️ [BG-FIX] Keeping better/equivalent title: "${dbTitle?.substring(0, 30)}..."`);
                         }
                     } else {
                         console.log(`   📦 [BG-FIX] Title verified: "${finalTitle.substring(0, 50)}..." (Source: ${bestTitleData.source})`);
@@ -670,10 +681,46 @@ const runSequentialBackgroundJobs = async (options) => {
                     const bestTitleData = getBestTitle(realPackName);
                     const finalTitle = bestTitleData.title;
 
-                    if (finalTitle && finalTitle !== pack.title) {
-                        console.log(`   📦 [BG-FIX] Updating title: "${pack.title?.substring(0, 30)}..." -> "${finalTitle.substring(0, 50)}..." (Source: ${bestTitleData.source})`);
-                        if (dbHelper && typeof dbHelper.updateTorrentTitle === 'function') {
-                            await dbHelper.updateTorrentTitle(pack.hash, finalTitle);
+                    // ✅ FIX: Read ACTUAL DB title (pack.title is the scraper title, NOT the DB title)
+                    let dbTitle = pack.title;
+                    if (dbHelper && typeof dbHelper.getTorrent === 'function') {
+                        try {
+                            const dbRecord = await dbHelper.getTorrent(pack.hash);
+                            if (dbRecord && dbRecord.title) {
+                                dbTitle = dbRecord.title;
+                            }
+                        } catch (e) { /* use pack.title as fallback */ }
+                    }
+
+                    if (finalTitle && finalTitle !== dbTitle) {
+                        // ✅ CONSERVATIVE UPDATE LOGIC (Movie Version)
+                        const curr = (dbTitle || '').toLowerCase();
+                        const next = (finalTitle || '').toLowerCase();
+                        let shouldUpdate = false;
+
+                        // Rule 0: Emoji cleanup is always allowed
+                        if (curr.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim() === next) {
+                            shouldUpdate = true;
+                        }
+                        // Rule 1: New title MUST have Language
+                        else if (/ita|multi/.test(next)) {
+                            // Rule 2: If current lacks language, update
+                            if (!/ita|multi/.test(curr)) {
+                                shouldUpdate = true;
+                            }
+                            // Rule 3: Movie weakness - Update if missing Year
+                            else if (!/\b(19|20)\d{2}\b/.test(curr)) {
+                                shouldUpdate = true;
+                            }
+                        }
+
+                        if (shouldUpdate) {
+                            console.log(`   📦 [BG-FIX] Updating title: "${dbTitle?.substring(0, 30)}..." -> "${finalTitle.substring(0, 50)}..." (Source: ${bestTitleData.source})`);
+                            if (dbHelper && typeof dbHelper.updateTorrentTitle === 'function') {
+                                await dbHelper.updateTorrentTitle(pack.hash, finalTitle);
+                            }
+                        } else {
+                            console.log(`   ⏭️ [BG-FIX] Keeping better/equivalent title: "${dbTitle?.substring(0, 30)}..."`);
                         }
                     } else {
                         console.log(`   📦 [BG-FIX] Title verified: "${finalTitle.substring(0, 50)}..." (Source: ${bestTitleData.source})`);
