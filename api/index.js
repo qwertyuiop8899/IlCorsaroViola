@@ -7262,11 +7262,19 @@ async function handleStream(type, id, config, workerOrigin) {
                         const requestedTitle = normalizeForMatch(mediaDetails.title);
                         const requestedOriginal = mediaDetails.originalName ? normalizeForMatch(mediaDetails.originalName) : '';
                         const requestedItalian = italianTitle ? normalizeForMatch(italianTitle) : '';
+                        const getKeywords = (str) => {
+                            if (!str) return [];
+                            const words = str.split(' ').filter(Boolean);
+                            if (words.length <= 2) {
+                                return words.filter(w => w.length >= 2);
+                            }
+                            return words.filter(w => w.length > 2 || /\d/.test(w));
+                        };
                         const requestedWords = [...new Set([
-                            ...requestedTitle.split(' '),
-                            ...requestedOriginal.split(' '),
-                            ...requestedItalian.split(' ')  // ✅ Include Italian title!
-                        ].filter(w => w.length > 2))];
+                            ...getKeywords(requestedTitle),
+                            ...getKeywords(requestedOriginal),
+                            ...getKeywords(requestedItalian)
+                        ])];
                         const requestedYear = mediaDetails.year ? String(mediaDetails.year) : null;
 
                         const validPackResults = [];
@@ -7274,10 +7282,18 @@ async function handleStream(type, id, config, workerOrigin) {
 
                         for (const pack of packResults) {
                             const fileTitle = normalizeForMatch(pack.file_title || pack.file_path || '');
-                            const fileWords = fileTitle.split(' ').filter(w => w.length > 2);
+                            const fileWords = fileTitle.split(' ').filter(Boolean).filter(w => (fileTitle.split(' ').length <= 2 ? w.length >= 2 : (w.length > 2 || /\d/.test(w))));
 
-                            // ✅ TRUST IMDB ID: If pack has correct IMDb ID, skip all other checks
+                            // ✅ TRUST IMDB ID: If pack has correct IMDb ID, verify it doesn't wildly mismatch
                             if (pack.imdb_id && pack.imdb_id === mediaDetails.imdbId) {
+                                if (fileWords.length > 0 && requestedWords.length > 0) {
+                                    const hasAnyWordMatch = requestedWords.some(w => fileWords.some(fw => fw.includes(w) || w.includes(fw)));
+                                    if (!hasAnyWordMatch) {
+                                        console.warn(`⚠️ [DB SANITY] Pack file "${pack.file_title || pack.file_path}" has matching IMDb ID but 0 matching words for "${mediaDetails.title}" - EXCLUDING`);
+                                        corruptedHashes.push(pack.pack_hash);
+                                        continue;
+                                    }
+                                }
                                 validPackResults.push(pack);
                                 continue;
                             }
@@ -9577,10 +9593,20 @@ async function handleStream(type, id, config, workerOrigin) {
                         if (!filename || !title) return false;
                         const normFile = normalizeForMatch(filename);
                         const normTitle = normalizeForMatch(title);
-                        // Check if all words of title appear in filename
-                        const titleWords = normTitle.split(' ').filter(w => w.length > 2);
+                        if (!normTitle || !normFile) return false;
+
+                        // Check if words of title appear in filename
+                        const rawWords = normTitle.split(' ').filter(Boolean);
+                        const titleWords = (rawWords.length <= 2)
+                            ? rawWords.filter(w => w.length >= 2)
+                            : rawWords.filter(w => w.length > 2 || /\d/.test(w));
+
+                        if (titleWords.length === 0) {
+                            return normFile.includes(normTitle);
+                        }
+
                         const matchedWords = titleWords.filter(w => normFile.includes(w));
-                        return matchedWords.length >= Math.ceil(titleWords.length * 0.7); // 70% of words match
+                        return matchedWords.length > 0 && matchedWords.length >= Math.ceil(titleWords.length * 0.7);
                     };
 
                     for (const res of filteredResults) {

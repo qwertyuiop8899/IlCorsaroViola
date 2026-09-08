@@ -982,13 +982,21 @@ async function resolveMoviePackFile(infoHash, config, movieImdbId, targetTitles,
         }
     }
 
-    // If <= 1 video file, it's not really a pack to filter, but we return it as "verified"
+    // If <= 1 video file, verify it actually matches targetTitles before assuming it's the movie
     if (videoFiles.length === 1) {
-        console.log(`ℹ️ [PACK-HANDLER] Single video file found. Assuming it's the movie.`);
         const f = videoFiles[0];
         const correctIndex = f.id; // Use original index directly
         // ✅ FIX: Clean path - extract just filename
         const cleanFilename = f.path.replace(/^\/+/, '').split('/').pop() || f.path;
+
+        // Verify that the single file matches the requested movie
+        const singleMatch = findMovieFile(videoFiles, targetTitles, year);
+        if (!singleMatch && targetTitles && targetTitles.length > 0) {
+            console.log(`❌ [PACK-HANDLER] Single video file "${cleanFilename}" does NOT match requested title(s) ${JSON.stringify(targetTitles)}. Rejecting.`);
+            return null;
+        }
+
+        console.log(`ℹ️ [PACK-HANDLER] Single video file verified: "${cleanFilename}"`);
 
         // Save to pack_files (NOT files table - that's for series only)
         if (dbHelper && movieImdbId && typeof dbHelper.insertPackFiles === 'function') {
@@ -1087,17 +1095,34 @@ function findMovieFile(files, targetTitles, targetYear) {
     // Normalize input to array
     const titles = Array.isArray(targetTitles) ? targetTitles : [targetTitles];
 
-    // Clean function
-    const cleanTitle = (t) => t.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+    // Clean function - keep short 2-letter words for short titles (e.g. "F1", "IT", "Up") or words with digits
+    const cleanTitle = (t) => {
+        const words = (t || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+        if (words.length <= 2) {
+            return words.filter(w => w.length >= 2);
+        }
+        return words.filter(w => w.length > 2 || /\d/.test(w));
+    };
+
+    // Clean filename before checking sequel number to prevent audio formats like "5.1" or "7.1"
+    // and resolutions/years from being falsely detected as sequel numbers
+    const cleanForSequel = (s) => {
+        return s.toLowerCase()
+            .replace(/\b[1-9][\.\s][0-2]\b/g, '')      // audio channels: 5.1, 7.1, 2.0, 5 1, 7 1
+            .replace(/\b\d+b(it)?\b/gi, '')           // bit depth: 10bit, 8bit, 10b
+            .replace(/\b\d+p\b/gi, '')                // resolution: 1080p, 2160p
+            .replace(/\b[48]k\b/gi, '')               // 4k, 8k
+            .replace(/\b(19\d\d|20\d\d)\b/g, '');     // 4-digit years
+    };
 
     // ✅ FIX: Extract sequel number from title more carefully
     // Only match: "Part II", "Part 2", "Parte II", "Parte 2", standalone "2", "II", "III" etc
-    // EXCLUDE years like 1985, 1989, 2023
+    // EXCLUDE years like 1985, 1989, 2023, audio 5.1/7.1, resolutions
     const extractSequelNumber = (str) => {
-        const s = str.toLowerCase();
+        const s = cleanForSequel(str);
 
-        // Pattern 1: "Part II", "Part 2", "Parte II", "Parte 2"
-        const partMatch = s.match(/\b(?:part|parte)\s*([ivx]+|\d)\b/i);
+        // Pattern 1: "Part II", "Part 2", "Parte II", "Parte 2", "Vol 2", "Volume 2"
+        const partMatch = s.match(/\b(?:part|parte|vol|volume)\s*([ivx]+|\d)\b/i);
         if (partMatch) {
             const num = partMatch[1].toLowerCase();
             if (num === 'i') return 1;
@@ -1110,15 +1135,7 @@ function findMovieFile(files, targetTitles, targetYear) {
             if (parsed >= 1 && parsed <= 10) return parsed;
         }
 
-        // Pattern 2: Standalone number 1-9 NOT preceded by year pattern
-        // e.g. "Frozen 2", "Shrek 3", "Back to the Future 1"
-        // But NOT "Back to the Future (1985)" or "2160p"
-        const standaloneMatch = s.match(/(?<!\d)(?<![\(\[])\b([1-9])\b(?![0-9pki])/);
-        if (standaloneMatch) {
-            return parseInt(standaloneMatch[1]);
-        }
-
-        // Pattern 3: Roman numerals standalone (not part of resolution like "IV" in random text)
+        // Pattern 2: Roman numerals standalone (ii, iii, iv, v, vi)
         const romanMatch = s.match(/\b(ii|iii|iv|v|vi)\b/);
         if (romanMatch) {
             const num = romanMatch[1];
@@ -1127,6 +1144,12 @@ function findMovieFile(files, targetTitles, targetYear) {
             if (num === 'iv') return 4;
             if (num === 'v') return 5;
             if (num === 'vi') return 6;
+        }
+
+        // Pattern 3: Standalone number 1-9 NOT preceded by year pattern and NOT followed by dot/digit/resolution
+        const standaloneMatch = s.match(/(?<!\d)(?<![\(\[])\b([1-9])\b(?![0-9pki\.\/])/);
+        if (standaloneMatch) {
+            return parseInt(standaloneMatch[1]);
         }
 
         return null;
