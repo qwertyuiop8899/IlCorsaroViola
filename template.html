@@ -1690,9 +1690,9 @@
                     <span class="kofi-title-text">Obiettivo Server del Mese</span>
                   </span>
                 </div>
-                <div class="kofi-amounts" id="kofiAmountsWidget" aria-label="0 euro raccolti su un obiettivo di 18 euro, 0 percento">
+                <div class="kofi-amounts" id="kofiAmountsWidget" aria-label="0 euro raccolti su un obiettivo di 23 euro, 0 percento">
                   <strong class="kofi-current" id="kofiCurrentWidget">0.00€</strong>
-                  <span class="kofi-goal">su <strong id="kofiGoalWidget">18.00€</strong></span>
+                  <span class="kofi-goal">su <strong id="kofiGoalWidget">23.00€</strong></span>
                   <span class="kofi-percent" id="kofiPercentWidget">0%</span>
                 </div>
               </div>
@@ -4040,7 +4040,7 @@
                     .then(function (data) {
                         if (!data) return;
                         var current = data.current !== undefined ? data.current : 0;
-                        var goal = data.goal || 18;
+                        var goal = data.goal || 23;
                         var pct = data.percentage !== undefined ? data.percentage : Math.min(100, Math.round((current / goal) * 100));
                         var kofiUrl = data.donation_url || data.kofi_url || "https://www.paypal.com/paypalme/emanueleschiano";
                         if (kofiUrl === "https://ko-fi.com" || kofiUrl === "https://ko-fi.com/") {
