@@ -2260,56 +2260,47 @@
             <div class="button-group">
                 <button id="install_button" disabled data-i18n="open_stremio">▶️ Apri in Stremio</button>
 
-                <a href="https://ko-fi.com/G2G41MG3ZN" target="_blank" class="custom-kofi-union">
-                    <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi">
-                    <span data-i18n="kofi">Un Grog per noi 🍻</span>
+                <a href="https://www.paypal.com/paypalme/emanueleschiano" target="_blank" class="custom-support-btn" id="customSupportBtn">
+                    <span style="font-size: 1.1em; margin-right: 8px;">💙</span>
+                    <span data-i18n="kofi">Sostieni i server ↗</span>
                 </a>
 
                 <button id="copy_button" disabled data-i18n="install_btn">📋 Copia Link</button>
             </div>
 
             <style>
-                .custom-kofi-union {
+                .custom-support-btn, .custom-kofi-union {
                     flex: 1;
-                    /* Uguale ai bottoni originali */
                     min-width: 200px;
-                    /* Uguale ai bottoni originali */
                     display: inline-flex;
                     align-items: center;
                     justify-content: center;
-                    background: #00b521;
-                    /* Colore Ko-fi */
+                    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
                     color: #ffffff !important;
                     text-decoration: none !important;
                     border-radius: 8px;
-                    /* Uguale ai bottoni originali */
                     font-size: 1.2em;
-                    /* Uguale ai bottoni originali */
                     font-weight: 600;
-                    /* Uguale ai bottoni originali */
                     padding: 18px 35px;
-                    /* Uguale ai bottoni originali */
                     transition: all 0.3s ease;
-                    box-shadow: 0 4px 16px rgba(0, 181, 33, 0.3);
+                    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
                     box-sizing: border-box;
                 }
 
-                .custom-kofi-union:hover {
+                .custom-support-btn:hover, .custom-kofi-union:hover {
                     transform: translateY(-2px);
-                    /* Effetto hover originale */
                     filter: brightness(1.1);
-                    box-shadow: 0 6px 24px rgba(0, 181, 33, 0.4);
+                    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.5);
                 }
 
-                .custom-kofi-union img {
+                .custom-support-btn img, .custom-kofi-union img {
                     width: 24px;
                     margin-right: 10px;
                     vertical-align: middle;
                 }
 
-                /* Responsive: su mobile va a capo come gli altri */
                 @media (max-width: 640px) {
-                    .custom-kofi-union {
+                    .custom-support-btn, .custom-kofi-union {
                         width: 100%;
                     }
                 }
@@ -2336,7 +2327,7 @@
                     // Buttons
                     install_btn: '📋 Copia Link Installazione',
                     open_stremio: '▶️ Apri in Stremio',
-                    kofi: 'Un Grog per noi 🍻',
+                    kofi: 'Sostieni i server ↗',
                     custom_torrent: 'Aggiungi Torrent Custom',
                     status_ready: 'Configurazione pronta',
                     status_p2p: '(Solo P2P)',
@@ -2462,7 +2453,7 @@
                     // Buttons
                     install_btn: '📋 Copy Install Link',
                     open_stremio: '▶️ Open in Stremio',
-                    kofi: 'A Grog for us 🍻',
+                    kofi: 'Support the servers ↗',
                     custom_torrent: 'Add Custom Torrent',
                     status_ready: 'Configuration ready',
                     status_p2p: '(P2P only)',
@@ -4042,10 +4033,11 @@
                         var current = data.current !== undefined ? data.current : 0;
                         var goal = data.goal || 23;
                         var pct = data.percentage !== undefined ? data.percentage : Math.min(100, Math.round((current / goal) * 100));
-                        var kofiUrl = data.donation_url || data.kofi_url || "https://www.paypal.com/paypalme/emanueleschiano";
-                        if (kofiUrl === "https://ko-fi.com" || kofiUrl === "https://ko-fi.com/") {
-                            kofiUrl = "https://ko-fi.com/prisonmike8899";
-                        }
+                        var kofiUrl = (data.donation_url && !data.donation_url.includes("ko-fi.com"))
+                            ? data.donation_url
+                            : ((data.kofi_url && !data.kofi_url.includes("ko-fi.com"))
+                                ? data.kofi_url
+                                : "https://www.paypal.com/paypalme/emanueleschiano");
 
                         var cardEl = document.getElementById("kofiCard");
                         var amountsEl = document.getElementById("kofiAmountsWidget");
@@ -4064,6 +4056,8 @@
                         if (fillEl) fillEl.style.width = pct + "%";
                         if (cardEl) cardEl.classList.toggle("is-complete", pct >= 100);
                         if (btnEl && kofiUrl) btnEl.href = kofiUrl;
+                        var csb = document.getElementById("customSupportBtn");
+                        if (csb && kofiUrl) csb.href = kofiUrl;
                     })
                     .catch(function (e) {
                         console.log("Kofi stats fetch error", e);
