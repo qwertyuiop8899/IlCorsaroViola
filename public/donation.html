@@ -678,7 +678,11 @@
                     const pct = data.percentage !== undefined
                         ? Number(data.percentage)
                         : Math.min(100, Math.round((current / Math.max(goal, 1)) * 100));
-                    const donationUrl = data.donation_url || data.kofi_url || 'https://www.paypal.com/paypalme/emanueleschiano';
+                    const donationUrl = (data.donation_url && !data.donation_url.includes('ko-fi.com'))
+                        ? data.donation_url
+                        : ((data.kofi_url && !data.kofi_url.includes('ko-fi.com'))
+                            ? data.kofi_url
+                            : 'https://www.paypal.com/paypalme/emanueleschiano');
                     const qrUrl = data.qr_url || '/paypal-qr.png';
                     const money = (value) => value.toFixed(2).replace('.', ',') + ' €';
 
