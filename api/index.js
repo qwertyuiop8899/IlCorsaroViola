@@ -12110,7 +12110,7 @@ export default async function handler(req, res) {
             console.error('Error fetching central kofi-stats:', e.message);
             res.setHeader('Content-Type', 'application/json');
             return res.status(200).send(JSON.stringify({
-                goal: 18.0,
+                goal: 23.0,
                 current: 0.0,
                 percentage: 0.0,
                 currency: 'EUR',
