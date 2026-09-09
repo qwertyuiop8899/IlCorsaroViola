@@ -1684,7 +1684,7 @@
             <div class="kofi-card" id="kofiCard">
               <div class="kofi-header">
                 <div class="kofi-title">
-                  <span class="kofi-title-icon" aria-hidden="true">☕</span>
+                  <span class="kofi-title-icon" aria-hidden="true">💙</span>
                   <span class="kofi-title-copy">
                     <span class="kofi-kicker">Sostieni ICV</span>
                     <span class="kofi-title-text">Obiettivo Server del Mese</span>
@@ -1701,8 +1701,8 @@
               </div>
               <div class="kofi-footer">
                 <span class="kofi-subtext">Aiutaci a coprire i costi dell'infrastruttura (IlCorsaroViola, ICVDB, DebridMediaViola, Toastflix, Streailer, Streamvix)!</span>
-                <a href="https://ko-fi.com" target="_blank" rel="noopener" class="btn-kofi-widget" id="kofiBtnWidget">
-                  Dona su Ko-fi ☕
+                <a href="https://www.paypal.com/paypalme/emanueleschiano" target="_blank" rel="noopener" class="btn-kofi-widget" id="kofiBtnWidget">
+                  Sostieni i server ↗
                 </a>
               </div>
             </div>
@@ -4042,7 +4042,7 @@
                         var current = data.current !== undefined ? data.current : 0;
                         var goal = data.goal || 18;
                         var pct = data.percentage !== undefined ? data.percentage : Math.min(100, Math.round((current / goal) * 100));
-                        var kofiUrl = data.kofi_url || "https://ko-fi.com/prisonmike8899";
+                        var kofiUrl = data.donation_url || data.kofi_url || "https://www.paypal.com/paypalme/emanueleschiano";
                         if (kofiUrl === "https://ko-fi.com" || kofiUrl === "https://ko-fi.com/") {
                             kofiUrl = "https://ko-fi.com/prisonmike8899";
                         }
