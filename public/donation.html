@@ -1,209 +1,696 @@
 <!DOCTYPE html>
 <html lang="it">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sostieni i Server | IlCorsaroViola</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0714">
+    <meta name="description" content="Sostieni l'infrastruttura IlCorsaroViola e i servizi della community.">
+    <title>IlCorsaroViola · Sostieni i Server</title>
+    <link rel="icon" type="image/png" href="https://i.imgur.com/kZK4KKS.png">
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: #0d0b14;
-        color: #e0e0e0;
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-      }
-      .container {
-        background: #14121e;
-        border: 1px solid #2d264a;
-        border-radius: 20px;
-        padding: 40px 32px;
-        max-width: 520px;
-        width: 100%;
-        text-align: center;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-      }
-      .icon {
-        font-size: 48px;
-        margin-bottom: 12px;
-      }
-      h1 {
-        font-size: 26px;
-        font-weight: 700;
-        color: #ffffff;
-        margin-bottom: 12px;
-      }
-      .description {
-        font-size: 14px;
-        color: #a78bfa;
-        line-height: 1.6;
-        margin-bottom: 24px;
-      }
-      .services-list {
-        color: #ffffff;
-        font-weight: 600;
-      }
-      .notice-box {
-        background: rgba(124, 58, 237, 0.12);
-        border: 1px solid rgba(124, 58, 237, 0.3);
-        border-radius: 10px;
-        padding: 12px 16px;
-        font-size: 13px;
-        color: #c4b5fd;
-        line-height: 1.4;
-        margin-bottom: 24px;
-      }
-      .progress-container {
-        margin-bottom: 24px;
-        text-align: left;
-      }
-      .progress-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
-      }
-      .progress-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: #9ca3af;
-      }
-      .progress-amounts {
-        font-size: 14px;
-        font-weight: 700;
-        color: #4ade80;
-        font-family: monospace;
-      }
-      .progress-bar {
-        width: 100%;
-        height: 12px;
-        background: #221d38;
-        border-radius: 6px;
-        overflow: hidden;
-      }
-      .progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #7c3aed, #4ade80);
-        width: 0%;
-        transition: width 0.6s ease;
-      }
-      .qr-section {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 16px;
-        display: inline-block;
-        margin-bottom: 16px;
-      }
-      .qr-section img {
-        width: 200px;
-        height: 200px;
-        display: block;
-      }
-      .qr-hint {
-        font-size: 13px;
-        color: #9ca3af;
-        margin-bottom: 24px;
-      }
-      .btn-kofi {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        background: #7c3aed;
-        color: #ffffff;
-        font-size: 16px;
-        font-weight: 700;
-        padding: 14px 28px;
-        border-radius: 12px;
-        text-decoration: none;
-        width: 100%;
-        transition: background 0.2s;
-      }
-      .btn-kofi:hover {
-        background: #6d28d9;
-      }
+        :root {
+            color-scheme: dark;
+            --bg: #0b0714;
+            --surface: rgba(23, 17, 39, 0.82);
+            --surface-solid: #171127;
+            --surface-soft: rgba(255, 255, 255, 0.045);
+            --surface-hover: rgba(255, 255, 255, 0.075);
+            --border: rgba(255, 255, 255, 0.10);
+            --border-strong: rgba(255, 255, 255, 0.17);
+            --text: #f8f6ff;
+            --muted: #aaa4b8;
+            --subtle: #756f82;
+            --purple: #9a70ff;
+            --purple-bright: #bda3ff;
+            --toast: #f4a64b;
+            --toast-soft: rgba(244, 166, 75, 0.12);
+            --green: #6ee7a0;
+            --green-strong: #48d783;
+            --amber: #ffbd66;
+            --shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+            --radius-xl: 28px;
+            --radius-lg: 20px;
+            --radius-md: 14px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            min-height: 100vh;
+            min-height: 100svh;
+            overflow-x: hidden;
+            background:
+                radial-gradient(circle at 12% 10%, rgba(126, 79, 255, 0.20), transparent 30rem),
+                radial-gradient(circle at 88% 12%, rgba(244, 166, 75, 0.12), transparent 24rem),
+                radial-gradient(circle at 90% 72%, rgba(72, 215, 131, 0.10), transparent 32rem),
+                linear-gradient(145deg, #0b0714 0%, #0e0a17 48%, #090b10 100%);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            -webkit-font-smoothing: antialiased;
+            padding:
+                max(18px, env(safe-area-inset-top))
+                max(18px, env(safe-area-inset-right))
+                max(28px, env(safe-area-inset-bottom))
+                max(18px, env(safe-area-inset-left));
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            z-index: -1;
+            inset: 0;
+            opacity: 0.15;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+            background-size: 52px 52px;
+            mask-image: linear-gradient(to bottom, black, transparent 80%);
+        }
+
+        a, button { font: inherit; -webkit-tap-highlight-color: transparent; }
+
+        a:focus-visible, button:focus-visible {
+            outline: 3px solid rgba(189, 163, 255, 0.55);
+            outline-offset: 3px;
+        }
+
+        button { color: inherit; }
+
+        .site-header,
+        .page-shell,
+        .site-footer {
+            width: min(1120px, 100%);
+            margin-inline: auto;
+        }
+
+        .site-header {
+            min-height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: clamp(42px, 7vw, 82px);
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .brand img {
+            width: 46px;
+            height: 46px;
+            display: block;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 14px;
+            box-shadow: 0 10px 28px rgba(97, 58, 195, 0.34);
+            object-fit: cover;
+            background: #171127;
+        }
+
+        .brand-copy { display: grid; gap: 1px; }
+        .brand-name { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
+        .brand-tagline {
+            color: var(--subtle);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.11em;
+            text-transform: uppercase;
+        }
+
+        .header-tools { display: flex; align-items: center; gap: 10px; }
+
+        .status-pill,
+        .lang-switch {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.045);
+        }
+
+        .status-pill {
+            min-height: 36px;
+            gap: 8px;
+            padding: 8px 13px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--toast);
+            box-shadow: 0 0 0 5px rgba(244, 166, 75, 0.11);
+        }
+
+        .lang-switch { padding: 3px; gap: 2px; }
+
+        .lang-switch button {
+            border: 0;
+            border-radius: 999px;
+            padding: 5px 10px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 800;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .lang-switch button.active {
+            background: rgba(154, 112, 255, 0.35);
+            color: #fff;
+        }
+
+        .donation-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 0.90fr) minmax(460px, 1.10fr);
+            gap: clamp(34px, 6vw, 82px);
+            align-items: center;
+        }
+
+        .hero-copy { padding-top: 10px; }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            min-height: 32px;
+            margin-bottom: 22px;
+            padding: 7px 12px;
+            border: 1px solid rgba(244, 166, 75, 0.30);
+            border-radius: 999px;
+            background: var(--toast-soft);
+            color: var(--toast);
+            font-size: 12px;
+            font-weight: 750;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            max-width: 660px;
+            color: #fff;
+            font-size: clamp(44px, 6vw, 76px);
+            font-weight: 850;
+            letter-spacing: -0.06em;
+            line-height: 0.96;
+        }
+
+        h1 span {
+            display: block;
+            background: linear-gradient(110deg, var(--purple-bright), #e9deff 42%, var(--toast) 105%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .hero-lead {
+            max-width: 560px;
+            margin-top: 25px;
+            color: var(--muted);
+            font-size: clamp(17px, 2vw, 20px);
+            line-height: 1.6;
+        }
+
+        .services-heading {
+            margin-top: 34px;
+            color: var(--toast);
+            font-size: 11px;
+            font-weight: 850;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .service-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+            max-width: 620px;
+        }
+
+        .service-cloud a {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 10px;
+            border: 1px solid rgba(244, 166, 75, 0.30);
+            border-radius: 999px;
+            background: var(--toast);
+            color: #0b0b0b;
+            font-size: 12px;
+            font-weight: 750;
+            box-shadow: 4px 4px 0 var(--purple);
+            text-decoration: none;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .service-cloud a:hover,
+        .service-cloud a:focus-visible {
+            background: #ffbd66;
+            color: #0b0b0b;
+            box-shadow: 5px 5px 0 var(--purple);
+            transform: translate(-2px, -2px);
+        }
+
+        .support-card {
+            position: relative;
+            overflow: hidden;
+            padding: clamp(24px, 4vw, 36px);
+            border: 1px solid rgba(244, 166, 75, 0.28);
+            border-radius: var(--radius-xl);
+            background: linear-gradient(155deg, rgba(30, 23, 49, 0.93), rgba(19, 15, 31, 0.86));
+            box-shadow: 10px 10px 0 rgba(117, 71, 237, 0.72), var(--shadow);
+            backdrop-filter: blur(22px);
+        }
+
+        .support-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: inherit;
+            background: linear-gradient(125deg, rgba(244, 166, 75, 0.13), transparent 36%);
+        }
+
+        .card-content { position: relative; z-index: 1; }
+
+        .card-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .step-label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--toast);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        h2 {
+            color: #fff;
+            font-size: clamp(25px, 3vw, 36px);
+            letter-spacing: -0.045em;
+        }
+
+        .goal-pill {
+            padding: 7px 10px;
+            border: 1px solid rgba(244, 166, 75, 0.34);
+            border-radius: 999px;
+            background: var(--toast-soft);
+            color: var(--toast);
+            font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .notice-box {
+            margin-bottom: 22px;
+            padding: 14px 15px;
+            border: 1px solid rgba(244, 166, 75, 0.28);
+            border-radius: var(--radius-md);
+            background: var(--toast-soft);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .notice-box strong { color: var(--toast); }
+
+        .progress-card {
+            margin-bottom: 24px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .progress-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .progress-title {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .progress-amounts {
+            color: var(--green);
+            font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .progress-bar {
+            height: 10px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .progress-fill {
+            height: 100%;
+            min-width: 4px;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--purple), var(--toast));
+            box-shadow: 0 0 16px rgba(110, 231, 160, 0.28);
+            transition: width 0.65s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: minmax(185px, 0.85fr) minmax(0, 1.15fr);
+            gap: 26px;
+            align-items: center;
+        }
+
+        .qr-section {
+            width: fit-content;
+            padding: 0;
+            border: none;
+            border-radius: 20px;
+            overflow: hidden;
+            background: transparent;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+        }
+
+        .qr-section img {
+            width: clamp(155px, 19vw, 205px);
+            height: clamp(155px, 19vw, 205px);
+            display: block;
+            border-radius: 20px;
+            object-fit: contain;
+        }
+
+        .action-copy { display: grid; gap: 14px; }
+
+        .qr-hint {
+            max-width: 270px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .btn-kofi {
+            min-height: 52px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 13px 18px;
+            border: 1px solid #0b0b0b;
+            border-radius: 14px;
+            background: var(--toast);
+            box-shadow: 6px 6px 0 var(--purple);
+            color: #0b0b0b;
+            font-size: 14px;
+            font-weight: 800;
+            text-decoration: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        }
+
+        .btn-kofi:hover {
+            background: #ffbd66;
+            box-shadow: 8px 8px 0 var(--purple);
+            filter: none;
+            transform: translate(-2px, -2px);
+        }
+
+        .btn-kofi:active { transform: translateY(0) scale(0.985); }
+
+        .footer-note {
+            margin-top: 18px;
+            color: var(--subtle);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .site-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            margin-top: 36px;
+            padding-top: 22px;
+            border-top: 1px solid rgba(255, 255, 255, 0.065);
+            color: var(--subtle);
+            font-size: 11px;
+        }
+
+        .footer-link { color: var(--toast); text-decoration: none; }
+        .footer-link:hover { color: #fff; }
+
+        @media (max-width: 760px) {
+            .donation-grid { grid-template-columns: 1fr; gap: 38px; }
+            .hero-copy { padding-top: 0; }
+            .support-card { width: min(620px, 100%); }
+        }
+
+        @media (max-width: 560px) {
+            body { padding-inline: max(14px, env(safe-area-inset-left)); }
+            .site-header { margin-bottom: 38px; }
+            .status-pill { padding-inline: 10px; font-size: 11px; }
+            .brand-tagline { display: none; }
+            h1 { font-size: clamp(42px, 14vw, 62px); }
+            .hero-lead { font-size: 16px; }
+            .support-card { padding: 22px 18px; border-radius: 23px; }
+            .action-grid { grid-template-columns: 1fr; justify-items: center; }
+            .action-copy { width: 100%; text-align: center; }
+            .qr-hint { max-width: none; }
+            .btn-kofi { width: 100%; }
+            .site-footer { align-items: flex-start; flex-direction: column; gap: 8px; }
+        }
+
+        @media (max-width: 390px) {
+            .header-tools { gap: 5px; }
+            .status-pill { min-height: 32px; padding: 7px 8px; }
+            .status-pill .status-label { display: none; }
+            .lang-switch button { padding-inline: 7px; }
+            .progress-header { align-items: flex-start; flex-direction: column; gap: 5px; }
+        }
     </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="icon">☕</div>
-      <h1>Sostieni i Server</h1>
-
-      <p class="description">
-        Mantenere online l'intera infrastruttura (<span class="services-list">IlCorsaroViola, ICVDB, DebridMediaViola, Toastflix, Streailer, Streamvix</span>) richiede <strong id="descGoal">18.00€ al mese</strong> per coprire i costi dei server e dei proxy.
-      </p>
-
-      <div class="notice-box">
-        ✨ <strong>Scomparsa Automatica:</strong> Raggiunta la quota di
-        <span id="noticeGoal">18.00€</span> mensili, questo link fittizio di
-        donazione <strong>scomparirà automaticamente da Stremio</strong> fino
-        alla fine del mese!
-      </div>
-
-      <div class="progress-container">
-        <div class="progress-header">
-          <span class="progress-title">Obiettivo del mese</span>
-          <span class="progress-amounts" id="kofiAmounts">0.00€ / 18.00€</span>
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="IlCorsaroViola, torna alla home">
+            <img src="https://i.imgur.com/kZK4KKS.png" onerror="this.src='/prisonmike.png'" alt="Logo IlCorsaroViola">
+            <span class="brand-copy">
+                <span class="brand-name">IlCorsaroViola</span>
+                <span class="brand-tagline" id="brandTagline">Addon per Stremio</span>
+            </span>
+        </a>
+        <div class="header-tools">
+            <div class="lang-switch" aria-label="Lingua">
+                <button type="button" id="langIt" class="active">🇮🇹 ITA</button>
+                <button type="button" id="langEn">🇬🇧 ENG</button>
+            </div>
+            <span class="status-pill" aria-label="Servizio online">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span class="status-label" id="statusLabel">Servizio online</span>
+            </span>
         </div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="kofiProgressFill"></div>
+    </header>
+
+    <main class="page-shell">
+        <div class="donation-grid">
+            <section class="hero-copy" aria-labelledby="pageTitle">
+                <span class="eyebrow" id="eyebrow">IlCorsaroViola / Community / Support</span>
+                <h1 id="pageTitle">Tieni a galla <span>il veliero.</span></h1>
+                <p class="hero-lead" id="heroLead">
+                    Un piccolo aiuto mantiene online l'infrastruttura che fa funzionare
+                    IlCorsaroViola e gli altri servizi della community.
+                </p>
+                <div class="services-heading" id="servicesHeading">Infrastruttura sostenuta</div>
+                <div class="service-cloud" aria-label="Servizi sostenuti">
+                    <a href="https://icv.stremio-italia.eu" target="_blank" rel="noopener noreferrer">IlCorsaroViola</a>
+                    <a href="https://toastflix.stremio-italia.eu" target="_blank" rel="noopener noreferrer">ToastFlix</a>
+                    <a href="https://dmv.stremio-italia.eu/db" target="_blank" rel="noopener noreferrer">ICVDB</a>
+                    <a href="https://dmv.stremio-italia.eu" target="_blank" rel="noopener noreferrer">DebridMediaViola</a>
+                    <a href="https://streailer.elfhosted.com" target="_blank" rel="noopener noreferrer">Streailer</a>
+                    <a href="https://streamvix.hayd.uk" target="_blank" rel="noopener noreferrer">Streamvix</a>
+                    <a href="https://tvvoo.hayd.uk" target="_blank" rel="noopener noreferrer">TVvoo</a>
+                    <a href="https://streamlists.stremio-italia.eu" target="_blank" rel="noopener noreferrer">Streamlists</a>
+                    <a href="https://noprox.stremio-italia.eu/donation.html" target="_blank" rel="noopener noreferrer">Sostieni</a>
+                </div>
+            </section>
+
+            <section class="support-card" aria-labelledby="supportTitle">
+                <div class="card-content">
+                    <div class="card-heading">
+                        <div>
+                            <span class="step-label" id="stepLabel">Supporto mensile</span>
+                            <h2 id="supportTitle">Sostieni i server</h2>
+                        </div>
+                        <span class="goal-pill" id="goalPill">23,00 € / mese</span>
+                    </div>
+
+                    <div class="notice-box" id="noticeBox">
+                        ✨ <strong>Scomparsa automatica:</strong> raggiunta la quota mensile,
+                        il link di donazione scomparirà automaticamente da Stremio fino alla fine del mese.
+                    </div>
+
+                    <div class="progress-card">
+                        <div class="progress-header">
+                            <span class="progress-title" id="progressTitle">Obiettivo del mese</span>
+                            <span class="progress-amounts" id="kofiAmounts">0,00 € / 23,00 €</span>
+                        </div>
+                        <div class="progress-bar" role="progressbar" aria-label="Progresso donazioni mensili" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="kofiProgress">
+                            <div class="progress-fill" id="kofiProgressFill" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="action-grid">
+                        <div class="qr-section">
+                            <img id="qrImg" src="/paypal-qr.png" alt="Inquadra con il telefono per sostenere i server">
+                        </div>
+                        <div class="action-copy">
+                            <p class="qr-hint" id="qrHint">📲 Sei sulla TV? Inquadra il QR con la fotocamera del tuo smartphone per sostenere i server.</p>
+                            <a href="https://www.paypal.com/paypalme/emanueleschiano" target="_blank" rel="noopener noreferrer" class="btn-kofi" id="kofiBtn">
+                                <span aria-hidden="true">💙</span><span id="kofiBtnText">Sostieni i server ↗</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <p class="footer-note" id="footerNote">Grazie di cuore a tutti coloro che supportano la community.</p>
+                </div>
+            </section>
         </div>
-      </div>
+    </main>
 
-      <div class="qr-section">
-        <img id="qrImg" src="" alt="Inquadra con il telefono per donare" />
-      </div>
-      <p class="qr-hint">
-        📲 Se sei sulla TV, inquadra il QR Code con la fotocamera del tuo
-        smartphone per donare su Ko-fi!
-      </p>
-
-      <a
-        href="https://ko-fi.com"
-        target="_blank"
-        rel="noopener"
-        class="btn-kofi"
-        id="kofiBtn"
-      >
-        Dona ora su Ko-fi ☕
-      </a>
-    </div>
+    <footer class="site-footer">
+        <span id="footerText">IlCorsaroViola · Fatto con cura per la community</span>
+        <a class="footer-link" href="/" id="backHome">Torna alla home ↗</a>
+    </footer>
 
     <script>
-      fetch("/api/kofi-stats")
-        .then((r) => r.json())
-        .then((data) => {
-          if (!data) return;
-          const current = data.current || 0;
-          const goal = data.goal || 18;
-          const pct =
-            data.percentage !== undefined
-              ? data.percentage
-              : Math.min(100, Math.round((current / goal) * 100));
-          let kofiUrl = data.kofi_url || "https://ko-fi.com/prisonmike8899";
-          if (kofiUrl === "https://ko-fi.com" || kofiUrl === "https://ko-fi.com/") {
-            kofiUrl = "https://ko-fi.com/prisonmike8899";
-          }
+        (function () {
+            'use strict';
 
-          document.getElementById("kofiAmounts").textContent =
-            current.toFixed(2) + "€ / " + goal.toFixed(2) + "€ (" + pct + "%)";
-          document.getElementById("kofiProgressFill").style.width = pct + "%";
-          document.getElementById("descGoal").textContent =
-            goal.toFixed(2) + "€ al mese";
-          document.getElementById("noticeGoal").textContent =
-            goal.toFixed(2) + "€";
-          document.getElementById("kofiBtn").href = kofiUrl;
-          document.getElementById("qrImg").src =
-            "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" +
-            encodeURIComponent(kofiUrl);
-        })
-        .catch((err) => console.log("Kofi fetch error:", err));
+            const params = new URLSearchParams(window.location.search);
+            let language = params.get('lang') === 'en' ? 'en' : 'it';
+            const els = {
+                langIt: document.getElementById('langIt'),
+                langEn: document.getElementById('langEn'),
+                brandTagline: document.getElementById('brandTagline'),
+                statusLabel: document.getElementById('statusLabel'),
+                eyebrow: document.getElementById('eyebrow'),
+                pageTitle: document.getElementById('pageTitle'),
+                heroLead: document.getElementById('heroLead'),
+                servicesHeading: document.getElementById('servicesHeading'),
+                stepLabel: document.getElementById('stepLabel'),
+                supportTitle: document.getElementById('supportTitle'),
+                noticeBox: document.getElementById('noticeBox'),
+                progressTitle: document.getElementById('progressTitle'),
+                qrHint: document.getElementById('qrHint'),
+                kofiBtnText: document.getElementById('kofiBtnText'),
+                footerNote: document.getElementById('footerNote'),
+                footerText: document.getElementById('footerText'),
+                backHome: document.getElementById('backHome'),
+                goalPill: document.getElementById('goalPill'),
+                kofiAmounts: document.getElementById('kofiAmounts'),
+                kofiProgress: document.getElementById('kofiProgress'),
+                kofiProgressFill: document.getElementById('kofiProgressFill'),
+                kofiBtn: document.getElementById('kofiBtn'),
+                qrImg: document.getElementById('qrImg')
+            };
+
+            const copy = {
+                it: {
+                    brandTagline: 'Addon per Stremio', statusLabel: 'Servizio online',
+                    eyebrow: 'IlCorsaroViola / Community / Support', pageTitle: 'Tieni a galla <span>il veliero.</span>',
+                    heroLead: "Un piccolo aiuto mantiene online l'infrastruttura che fa funzionare IlCorsaroViola e gli altri servizi della community.",
+                    servicesHeading: 'Infrastruttura sostenuta', stepLabel: 'Supporto mensile',
+                    supportTitle: 'Sostieni i server', progressTitle: 'Obiettivo del mese',
+                    qrHint: '📲 Sei sulla TV? Inquadra il QR con la fotocamera del tuo smartphone per sostenere i server.',
+                    button: 'Sostieni i server ↗',
+                    kofiBtnText: 'Sostieni i server ↗', footerNote: 'Grazie di cuore a tutti coloro che supportano la community.',
+                    footerText: 'IlCorsaroViola · Fatto con cura per la community', backHome: 'Torna alla home ↗'
+                },
+                en: {
+                    brandTagline: 'Stremio Addon', statusLabel: 'Service online',
+                    eyebrow: 'IlCorsaroViola / Community / Support', pageTitle: 'Keep the pirate <span>ship sailing.</span>',
+                    heroLead: 'A small contribution keeps the infrastructure behind IlCorsaroViola and the community services online.',
+                    servicesHeading: 'Supported infrastructure', stepLabel: 'Monthly support',
+                    supportTitle: 'Support the servers', progressTitle: 'Monthly goal',
+                    qrHint: '📲 Watching on TV? Scan the QR code with your phone camera to support the servers.',
+                    button: 'Support the servers ↗',
+                    kofiBtnText: 'Support the servers ↗', footerNote: 'Heartfelt thanks to everyone supporting the community.',
+                    footerText: 'IlCorsaroViola · Crafted for the community', backHome: 'Back to home ↗'
+                }
+            };
+
+            function applyLanguage() {
+                const text = copy[language];
+                document.documentElement.lang = language;
+                document.title = language === 'en' ? 'IlCorsaroViola · Support the Servers' : 'IlCorsaroViola · Sostieni i Server';
+                Object.keys(text).forEach((key) => {
+                    if (!els[key]) return;
+                    if (key === 'pageTitle') els[key].innerHTML = text[key];
+                    else els[key].textContent = text[key];
+                });
+                els.noticeBox.innerHTML = language === 'en'
+                    ? '✨ <strong>Auto-hide:</strong> once the monthly goal is reached, the donation link will automatically disappear from Stremio until the end of the month.'
+                    : '✨ <strong>Scomparsa automatica:</strong> raggiunta la quota mensile, il link di donazione scomparirà automaticamente da Stremio fino alla fine del mese.';
+                els.langIt.classList.toggle('active', language === 'it');
+                els.langEn.classList.toggle('active', language === 'en');
+            }
+
+            function setLanguage(next) {
+                language = next;
+                const query = language === 'en' ? '?lang=en' : '';
+                window.history.replaceState({}, '', '/donation.html' + query);
+                applyLanguage();
+            }
+
+            els.langIt.addEventListener('click', () => setLanguage('it'));
+            els.langEn.addEventListener('click', () => setLanguage('en'));
+            applyLanguage();
+
+            fetch('/api/kofi-stats')
+                .then((response) => response.json())
+                .then((data) => {
+                    if (!data) return;
+                    const current = Number(data.current || 0);
+                    const goal = Number(data.goal || 23);
+                    const pct = data.percentage !== undefined
+                        ? Number(data.percentage)
+                        : Math.min(100, Math.round((current / Math.max(goal, 1)) * 100));
+                    const donationUrl = data.donation_url || data.kofi_url || 'https://www.paypal.com/paypalme/emanueleschiano';
+                    const qrUrl = data.qr_url || '/paypal-qr.png';
+                    const money = (value) => value.toFixed(2).replace('.', ',') + ' €';
+
+                    els.goalPill.textContent = money(goal) + (language === 'en' ? ' / month' : ' / mese');
+                    els.kofiAmounts.textContent = money(current) + ' / ' + money(goal) + ' (' + pct + '%)';
+                    els.kofiProgressFill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+                    els.kofiProgress.setAttribute('aria-valuenow', String(pct));
+                    els.kofiBtn.href = donationUrl;
+                    els.qrImg.src = qrUrl;
+                })
+                .catch((error) => console.log('Donation stats error:', error));
+        }());
     </script>
-  </body>
+</body>
 </html>
