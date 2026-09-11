@@ -2,6 +2,7 @@
 // Questo file wrappa l'handler Vercel in un server Express
 
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import handler from './api/index.js';
 
 // 🔧 Import DB helper for early initialization
@@ -18,6 +19,16 @@ if (process.env.DATABASE_URL) {
     dbHelper.initDatabase();
     console.log('✅ Database pre-initialized at startup');
 }
+
+// 🛡️ Rate limiting per prevenire flooding di richieste su tutti gli endpoint
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minuti
+    max: 300, // massimo 300 richieste per IP per finestra
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
+app.use(apiLimiter);
 
 // Middleware per parsing JSON e form data
 app.use(express.json({ limit: '10mb' }));
