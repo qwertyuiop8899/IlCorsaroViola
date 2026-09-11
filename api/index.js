@@ -6876,6 +6876,8 @@ async function handleStream(type, id, config, workerOrigin) {
         let searchQueries = [];
         let italianTitle = null;
         let originalTitle = null;
+        let contentReleaseDate = null;
+        let isPriorityRelease = false;
 
         // 🔄 SEQUENTIAL BACKGROUND JOBS: Accumulate items to process at the end
         // This replaces parallel fire-and-forget calls with a sequential approach
@@ -10014,7 +10016,6 @@ async function handleStream(type, id, config, workerOrigin) {
             );
 
             // ✅ Check if content is too recent (< 96 hours / 4 days since release)
-            let contentReleaseDate = null;
             let isTooRecent = false;
 
             if (type === 'series' && season && episode && mediaDetails?.tmdbId) {
@@ -10027,6 +10028,12 @@ async function handleStream(type, id, config, workerOrigin) {
 
             if (contentReleaseDate) {
                 isTooRecent = isContentTooRecent(contentReleaseDate);
+                try {
+                    const diffDays = (Date.now() - new Date(contentReleaseDate).getTime()) / (1000 * 60 * 60 * 24);
+                    if (diffDays >= -1 && diffDays <= 7) {
+                        isPriorityRelease = true;
+                    }
+                } catch (_) {}
                 if (isTooRecent) {
                     const release = new Date(contentReleaseDate);
                     const hoursAgo = Math.round((new Date() - release) / (1000 * 60 * 60));
@@ -11727,6 +11734,25 @@ async function handleStream(type, id, config, workerOrigin) {
                 console.log(`🔍 [Enrichment Titles] Italian: "${italianTitle || 'N/A'}", Original: "${originalTitle || 'N/A'}", English: "${mediaDetails.title}"`);
             }
 
+                        if (!contentReleaseDate && mediaDetails) {
+                try {
+                    if (type === 'series' && season && episode && mediaDetails.tmdbId) {
+                        contentReleaseDate = await getEpisodeAirDate(mediaDetails.tmdbId, season, episode, tmdbKey);
+                    } else if (type === 'movie' && mediaDetails.releaseDate) {
+                        contentReleaseDate = mediaDetails.releaseDate;
+                    }
+                    if (contentReleaseDate) {
+                        const diffDays = (Date.now() - new Date(contentReleaseDate).getTime()) / (1000 * 60 * 60 * 24);
+                        if (diffDays >= -1 && diffDays <= 7) {
+                            isPriorityRelease = true;
+                        }
+                    }
+                } catch (_) {}
+            }
+            if (isPriorityRelease) {
+                console.log("🔥 [Priority Release] " + (mediaDetails.title || "") + " (aired: " + (contentReleaseDate || "N/A") + ") within 7 days -> PRIORITY flagged for enrichment");
+            }
+
             // 🔄 Load balancing: Round-robin between standard servers, always call light server if configured
             const enrichmentServers = [
                 process.env.ENRICHMENT_SERVER_URL,
@@ -11793,6 +11819,8 @@ async function handleStream(type, id, config, workerOrigin) {
                             year: mediaDetails.year,
                             season: season,
                             episode: episode,
+                            isPriority: isPriorityRelease,
+                            airDate: contentReleaseDate,
                             searchQueries: searchQueries || []
                         }),
                         signal: AbortSignal.timeout(5000)
