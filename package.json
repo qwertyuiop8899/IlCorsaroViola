@@ -21,6 +21,7 @@
     "cheerio": "^1.0.0-rc.12",
     "dotenv": "^17.2.3",
     "express": "^4.22.1",
+    "express-rate-limit": "^7.4.0",
     "fuzzball": "^2.2.6",
     "multer": "^2.0.2",
     "node-fetch": "^2.7.0",
